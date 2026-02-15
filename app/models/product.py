@@ -1,4 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+# GMT+7 (WIB - Western Indonesian Time)
+TZ_GMT7 = timezone(timedelta(hours=7))
 
 from sqlalchemy import (
     BigInteger,
@@ -43,12 +46,12 @@ class Product(Base):
     raw_data: Mapped[dict | None] = mapped_column(JsonType)
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(TZ_GMT7)
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(TZ_GMT7),
+        onupdate=lambda: datetime.now(TZ_GMT7),
     )
 
     models: Mapped[list["ProductModel"]] = relationship(
@@ -74,12 +77,12 @@ class ProductModel(Base):
     raw_data: Mapped[dict | None] = mapped_column(JsonType)
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(TZ_GMT7)
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(TZ_GMT7),
+        onupdate=lambda: datetime.now(TZ_GMT7),
     )
 
     product: Mapped["Product"] = relationship(back_populates="models")
@@ -94,10 +97,10 @@ class ShopeeToken(Base):
     refresh_token: Mapped[str | None] = mapped_column(String(500))
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(TZ_GMT7)
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(TZ_GMT7),
+        onupdate=lambda: datetime.now(TZ_GMT7),
     )

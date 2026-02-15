@@ -1,5 +1,7 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
+
+from app.models.product import TZ_GMT7
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -74,7 +76,7 @@ async def _sync_item_batch(access_token: str, shop_id: int, item_ids: list[int])
     )
 
     items = data.get("response", {}).get("item_list", [])
-    now = datetime.now(timezone.utc)
+    now = datetime.now(TZ_GMT7)
 
     async with async_session() as session:
         for item in items:

@@ -1,5 +1,7 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+
+from app.models.product import TZ_GMT7
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,7 +42,7 @@ async def refresh_token_if_needed(shop_id: int) -> str | None:
         if not token:
             return None
 
-        if token.token_expires_at and token.token_expires_at > datetime.now(timezone.utc) + timedelta(minutes=10):
+        if token.token_expires_at and token.token_expires_at > datetime.now(TZ_GMT7) + timedelta(minutes=10):
             return token.access_token
 
         logger.info("Refreshing Shopee token for shop %d", shop_id)
@@ -76,7 +78,7 @@ async def _get_token(session: AsyncSession, shop_id: int) -> ShopeeToken | None:
 
 async def _upsert_token(session: AsyncSession, shop_id: int, data: dict) -> None:
     token = await _get_token(session, shop_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(TZ_GMT7)
     expire_in = data.get("expire_in", 14400)
 
     if token is None:
