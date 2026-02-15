@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     shopee_base_url: str = "https://openplatform.sandbox.test-stable.shopee.sg"
     shopee_redirect_url: str = "http://localhost:8000/api/auth/callback"
 
+    api_key: str = ""
+
     sync_interval_minutes: int = 60
 
     model_config = {"env_file": str(ENV_FILE), "env_file_encoding": "utf-8"}

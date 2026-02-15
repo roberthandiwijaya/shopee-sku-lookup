@@ -1,12 +1,18 @@
-from datetime import datetime, timezone
+from datetime import datetime
+
+from app.models.product import TZ_GMT7
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.config import settings
 from app.database import get_session
 from app.main import app
 from app.models.product import Base, Product, ProductModel
+
+TEST_API_KEY = "test-api-key-for-testing"
+settings.api_key = TEST_API_KEY
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
@@ -41,7 +47,7 @@ async def client():
 @pytest_asyncio.fixture
 async def seed_products():
     """Seed the test database with sample products."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(TZ_GMT7)
     async with TestSession() as session:
         p1 = Product(
             shop_id=1,

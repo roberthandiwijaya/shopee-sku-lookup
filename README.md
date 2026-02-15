@@ -31,9 +31,10 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` with your Shopee credentials:
+Edit `.env` with your Shopee credentials and API key:
 
 ```
+API_KEY=your_random_secret_key
 SHOPEE_PARTNER_ID=your_partner_id
 SHOPEE_PARTNER_KEY=your_partner_key
 SHOPEE_SHOP_ID=your_shop_id
@@ -58,7 +59,7 @@ Open `http://localhost:8000/api/auth/login` — this returns a Shopee OAuth URL.
 ### 7. Sync products
 
 ```bash
-curl -X POST http://localhost:8000/api/sync
+curl -X POST -H "X-API-Key: your_api_key" http://localhost:8000/api/sync
 ```
 
 Products also auto-sync every 60 minutes (configurable via `SYNC_INTERVAL_MINUTES`).
@@ -67,25 +68,25 @@ Products also auto-sync every 60 minutes (configurable via `SYNC_INTERVAL_MINUTE
 
 ```bash
 # Single SKU
-curl "http://localhost:8000/api/products?sku=YOUR_SKU"
+curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=YOUR_SKU"
 
 # Multiple SKUs
-curl "http://localhost:8000/api/products?sku=SKU1&sku=SKU2"
+curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1&sku=SKU2"
 
 # Comma-separated
-curl "http://localhost:8000/api/products?sku=SKU1,SKU2,SKU3"
+curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1,SKU2,SKU3"
 ```
 
 ## API Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/products?sku=...` | SKU lookup (single, multiple, or comma-separated) |
-| POST | `/api/sync` | Trigger manual product sync |
-| GET | `/api/sync/status` | Check last sync time and counts |
-| GET | `/api/auth/login` | Get Shopee OAuth URL |
-| GET | `/api/auth/callback` | OAuth callback (automatic) |
-| GET | `/docs` | Swagger UI |
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/api/products?sku=...` | `X-API-Key` | SKU lookup (single, multiple, or comma-separated) |
+| POST | `/api/sync` | `X-API-Key` | Trigger manual product sync |
+| GET | `/api/sync/status` | — | Check last sync time and counts |
+| GET | `/api/auth/login` | — | Get Shopee OAuth URL |
+| GET | `/api/auth/callback` | — | OAuth callback (automatic) |
+| GET | `/docs` | — | Swagger UI |
 
 ## Example Response
 
@@ -132,6 +133,7 @@ Tests use SQLite (no PostgreSQL required).
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `API_KEY` | API key for protected endpoints (sent via `X-API-Key` header) | — |
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://postgres:postgres@localhost:54558/shopee_products` |
 | `SHOPEE_PARTNER_ID` | Shopee partner ID | — |
 | `SHOPEE_PARTNER_KEY` | Shopee partner key | — |
