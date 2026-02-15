@@ -1,0 +1,37 @@
+<div class="bg-white rounded-lg shadow">
+    <div class="p-6 border-b">
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-800">Products</h2>
+            <div class="relative">
+                <input type="text"
+                       name="search"
+                       placeholder="Search by SKU..."
+                       hx-get="/partials/products"
+                       hx-trigger="input changed delay:300ms, search"
+                       hx-target="#product-tbody"
+                       hx-swap="innerHTML"
+                       hx-include="this"
+                       class="border rounded-lg px-4 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-500">
+            </div>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+                <tr>
+                    <th class="px-6 py-3 text-left w-8"></th>
+                    <th class="px-6 py-3 text-left">Item Name</th>
+                    <th class="px-6 py-3 text-left">SKU</th>
+                    <th class="px-6 py-3 text-left">Status</th>
+                    <th class="px-6 py-3 text-right">Price</th>
+                    <th class="px-6 py-3 text-right">Stock</th>
+                    <th class="px-6 py-3 text-left">Last Sync</th>
+                </tr>
+            </thead>
+            <tbody id="product-tbody">
+                {% include "partials/product_rows.html" %}
+            </tbody>
+        </table>
+    </div>
+</div>

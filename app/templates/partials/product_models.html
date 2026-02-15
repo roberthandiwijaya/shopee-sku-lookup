@@ -1,0 +1,32 @@
+<div class="bg-orange-50 px-10 py-2">
+    <table class="w-full text-sm">
+        <thead class="text-xs text-gray-500 uppercase">
+            <tr>
+                <th class="px-4 py-2 text-left">Variant</th>
+                <th class="px-4 py-2 text-left">Model SKU</th>
+                <th class="px-4 py-2 text-right">Price</th>
+                <th class="px-4 py-2 text-right">Stock</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for model in models %}
+            <tr class="border-b border-orange-100 last:border-0">
+                <td class="px-4 py-2 text-gray-700">{{ model.model_name or '-' }}</td>
+                <td class="px-4 py-2 font-mono text-gray-600">{{ model.model_sku or '-' }}</td>
+                <td class="px-4 py-2 text-right text-gray-700">
+                    {% if model.current_price is not none %}
+                        {{ "%.2f" | format(model.current_price | float) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="px-4 py-2 text-right text-gray-700">{{ model.stock if model.stock is not none else '-' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="px-4 py-3 text-center text-gray-400">No variants found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

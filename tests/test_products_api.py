@@ -145,4 +145,4 @@ async def test_sync_status_token_expired(client):
 async def test_root(client):
     resp = await client.get("/")
     assert resp.status_code == 200
-    assert "Shopee SKU Lookup API" in resp.json()["message"]
+    assert "Shopee SKU Dashboard" in resp.text

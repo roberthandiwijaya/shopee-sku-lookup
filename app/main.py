@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.routers import auth, products
+from app.routers import auth, dashboard, products
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -23,10 +23,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(dashboard.router)
 app.include_router(products.router)
 app.include_router(auth.router)
-
-
-@app.get("/")
-async def root():
-    return {"message": "Shopee SKU Lookup API", "docs": "/docs"}

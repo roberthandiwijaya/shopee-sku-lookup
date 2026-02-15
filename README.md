@@ -1,6 +1,6 @@
-# Shopee Product SKU Lookup API
+# Shopee Product SKU Lookup
 
-REST API that syncs products from Shopee Open API v2.0 to a local PostgreSQL database and serves fast SKU-based lookups.
+REST API + web dashboard that syncs products from Shopee Open API v2.0 to a local PostgreSQL database and serves fast SKU-based lookups.
 
 ## Tech Stack
 
@@ -8,6 +8,7 @@ REST API that syncs products from Shopee Open API v2.0 to a local PostgreSQL dat
 - **PostgreSQL** / **SQLAlchemy 2.0** (async) / **Alembic**
 - **httpx** for async Shopee API calls
 - **APScheduler** for periodic product sync
+- **Jinja2** + **htmx** + **Tailwind CSS** for the web dashboard (zero build tools)
 
 ## Quick Start
 
@@ -52,11 +53,23 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 6. Authorize with Shopee
+### 6. Open the dashboard
 
-Open `http://localhost:8000/api/auth/login` — this returns a Shopee OAuth URL. Open it in your browser, authorize, and the callback will store your tokens.
+Visit `http://localhost:8000/` to access the web dashboard where you can:
 
-### 7. Sync products
+- Monitor sync status and token health at a glance
+- Browse and search products by SKU
+- Expand products to view variants
+- Trigger manual syncs
+- Re-authorize your Shopee token
+
+### 7. Authorize with Shopee
+
+Click "Re-authorize" in the dashboard's auth panel, or open `http://localhost:8000/api/auth/login` — this returns a Shopee OAuth URL. Open it in your browser, authorize, and the callback will store your tokens.
+
+### 8. Sync products
+
+Click "Sync Now" in the dashboard, or via API:
 
 ```bash
 curl -X POST -H "X-API-Key: your_api_key" http://localhost:8000/api/sync
@@ -64,7 +77,7 @@ curl -X POST -H "X-API-Key: your_api_key" http://localhost:8000/api/sync
 
 Products also auto-sync every 60 minutes (configurable via `SYNC_INTERVAL_MINUTES`).
 
-### 8. Query by SKU
+### 9. Query by SKU
 
 ```bash
 # Single SKU
@@ -77,10 +90,23 @@ curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1&s
 curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1,SKU2,SKU3"
 ```
 
+## Dashboard
+
+The web dashboard at `/` provides three panels:
+
+| Panel | Features |
+|-------|----------|
+| **Sync Status** | Product/variant counts, last sync time, token health indicator, "Sync Now" button. Auto-refreshes every 30s. |
+| **Authentication** | Token status badge, expiry countdown, shop ID, "Re-authorize" button. Auto-refreshes every 30s. |
+| **Products** | Searchable product table with SKU filtering (300ms debounce), pagination, and expandable variant rows. |
+
+All interactions use htmx for seamless partial updates without full page reloads.
+
 ## API Endpoints
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
+| GET | `/` | — | Web dashboard |
 | GET | `/api/products?sku=...` | `X-API-Key` | SKU lookup (single, multiple, or comma-separated) |
 | POST | `/api/sync` | `X-API-Key` | Trigger manual product sync |
 | GET | `/api/sync/status` | — | Check last sync time and counts |

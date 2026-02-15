@@ -1,0 +1,89 @@
+{% for product in products %}
+<tr class="border-b hover:bg-gray-50">
+    <td class="px-6 py-3">
+        {% if product.has_model %}
+        <button class="text-gray-400 hover:text-orange-500 transition-colors"
+                onclick="
+                    var svg = this.querySelector('svg');
+                    var target = document.getElementById('models-{{ product.item_id }}');
+                    if (target.innerHTML.trim()) {
+                        target.innerHTML = '';
+                        svg.classList.remove('rotate-90');
+                    } else {
+                        svg.classList.add('rotate-90');
+                        htmx.ajax('GET', '/partials/products/{{ product.item_id }}/models', {target: target, swap: 'innerHTML'});
+                    }
+                ">
+            <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </button>
+        {% endif %}
+    </td>
+    <td class="px-6 py-3 font-medium text-gray-800 max-w-xs truncate" title="{{ product.item_name }}">
+        {{ product.item_name }}
+    </td>
+    <td class="px-6 py-3 font-mono text-gray-600">{{ product.item_sku or '-' }}</td>
+    <td class="px-6 py-3">
+        {% if product.item_status == "NORMAL" %}
+            <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">{{ product.item_status }}</span>
+        {% elif product.item_status %}
+            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{{ product.item_status }}</span>
+        {% else %}
+            -
+        {% endif %}
+    </td>
+    <td class="px-6 py-3 text-right text-gray-700">
+        {% if product.current_price is not none %}
+            {{ "%.2f" | format(product.current_price | float) }}
+        {% else %}
+            -
+        {% endif %}
+    </td>
+    <td class="px-6 py-3 text-right text-gray-700">{{ product.stock if product.stock is not none else '-' }}</td>
+    <td class="px-6 py-3 text-gray-500 text-xs">
+        {{ product.synced_at | wib }}
+    </td>
+</tr>
+{% if product.has_model %}
+<tr id="models-row-{{ product.item_id }}">
+    <td colspan="7" class="p-0">
+        <div id="models-{{ product.item_id }}"></div>
+    </td>
+</tr>
+{% endif %}
+{% else %}
+<tr>
+    <td colspan="7" class="px-6 py-8 text-center text-gray-400">No products found.</td>
+</tr>
+{% endfor %}
+
+{% if total_pages > 1 %}
+<tr>
+    <td colspan="7" class="px-6 py-4">
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">
+                Page {{ page }} of {{ total_pages }} ({{ total }} products)
+            </span>
+            <div class="flex space-x-2">
+                {% if page > 1 %}
+                <button hx-get="/partials/products?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}"
+                        hx-target="#product-tbody"
+                        hx-swap="innerHTML"
+                        class="px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors">
+                    Previous
+                </button>
+                {% endif %}
+                {% if page < total_pages %}
+                <button hx-get="/partials/products?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}"
+                        hx-target="#product-tbody"
+                        hx-swap="innerHTML"
+                        class="px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors">
+                    Next
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+</tr>
+{% endif %}

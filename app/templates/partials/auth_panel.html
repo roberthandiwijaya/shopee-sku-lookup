@@ -1,0 +1,47 @@
+<div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-4">Authentication</h2>
+
+    <div class="space-y-3">
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Status</span>
+            {% if token_details.status == "healthy" %}
+                <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Healthy</span>
+            {% elif token_details.status == "expiring_soon" %}
+                <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Expiring Soon</span>
+            {% elif token_details.status == "expired" %}
+                <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Expired</span>
+            {% else %}
+                <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Missing</span>
+            {% endif %}
+        </div>
+
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Shop ID</span>
+            <span class="text-sm font-mono text-gray-700">{{ token_details.shop_id }}</span>
+        </div>
+
+        {% if token_details.expires_at %}
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Expires</span>
+            <span class="text-sm text-gray-700">{{ token_details.expires_at | wib }}</span>
+        </div>
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Time Left</span>
+            <span class="text-sm text-gray-700">
+                {% if token_details.expires_in_hours and token_details.expires_in_hours > 0 %}
+                    {{ token_details.expires_in_hours }}h
+                {% else %}
+                    Expired
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="mt-4 pt-4 border-t">
+        <a href="{{ auth_url }}" target="_blank"
+           class="block text-center bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
+            Re-authorize
+        </a>
+    </div>
+</div>
