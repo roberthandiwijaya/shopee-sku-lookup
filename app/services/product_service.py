@@ -1,8 +1,11 @@
+from datetime import datetime, timedelta
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.product import Product, ProductModel
+from app.config import settings
+from app.models.product import Product, ProductModel, ShopeeToken, TZ_GMT7
 from app.schemas.product import ProductOut, ProductSearchResponse
 
 
@@ -48,8 +51,32 @@ async def get_sync_stats(session: AsyncSession) -> dict:
     last_sync = await session.scalar(
         select(func.max(Product.synced_at))
     )
+    token_status = await _get_token_status(session)
     return {
         "last_synced_at": last_sync,
         "total_products": product_count or 0,
         "total_models": model_count or 0,
+        "token_status": token_status,
     }
+
+
+async def _get_token_status(session: AsyncSession) -> str:
+    """Check the health of the Shopee token."""
+    result = await session.execute(
+        select(ShopeeToken).where(ShopeeToken.shop_id == settings.shopee_shop_id)
+    )
+    token = result.scalar_one_or_none()
+    if token is None:
+        return "missing"
+    if token.token_expires_at is None:
+        return "missing"
+    now = datetime.now(TZ_GMT7)
+    expires_at = token.token_expires_at
+    # Ensure timezone-aware comparison (SQLite may strip tzinfo)
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=TZ_GMT7)
+    if expires_at <= now:
+        return "expired"
+    if expires_at <= now + timedelta(hours=24):
+        return "expiring_soon"
+    return "healthy"

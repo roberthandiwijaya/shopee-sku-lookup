@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -12,6 +13,9 @@ from app.models.product import ShopeeToken
 from app.services import shopee_client
 
 logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+RETRY_BASE_DELAY = 2  # seconds
 
 
 async def exchange_code_for_token(code: str, shop_id: int) -> dict:
@@ -42,7 +46,10 @@ async def refresh_token_if_needed(shop_id: int) -> str | None:
         if not token:
             return None
 
-        if token.token_expires_at and token.token_expires_at > datetime.now(TZ_GMT7) + timedelta(minutes=10):
+        expires_at = token.token_expires_at
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=TZ_GMT7)
+        if expires_at and expires_at > datetime.now(TZ_GMT7) + timedelta(minutes=10):
             return token.access_token
 
         logger.info("Refreshing Shopee token for shop %d", shop_id)
@@ -51,17 +58,21 @@ async def refresh_token_if_needed(shop_id: int) -> str | None:
             "shop_id": shop_id,
             "partner_id": settings.shopee_partner_id,
         }
-        data = await shopee_client.public_request(
-            "/api/v2/auth/access_token/get", method="POST", json=body
-        )
 
-        if data.get("error"):
-            logger.error("Token refresh failed: %s", data)
-            return None
+        for attempt in range(MAX_RETRIES):
+            data = await shopee_client.public_request(
+                "/api/v2/auth/access_token/get", method="POST", json=body
+            )
+            if not data.get("error"):
+                await _upsert_token(session, shop_id, data)
+                await session.commit()
+                return data.get("access_token")
+            logger.warning("Token refresh attempt %d/%d failed: %s", attempt + 1, MAX_RETRIES, data)
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(RETRY_BASE_DELAY * (2 ** attempt))
 
-        await _upsert_token(session, shop_id, data)
-        await session.commit()
-        return data.get("access_token")
+        logger.error("All %d token refresh attempts failed for shop %d", MAX_RETRIES, shop_id)
+        return None
 
 
 async def get_valid_token(shop_id: int) -> str | None:

@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -9,6 +10,27 @@ import httpx
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+RETRY_BASE_DELAY = 2  # seconds
+
+
+async def _request_with_retry(client: httpx.AsyncClient, method: str, url: str, max_retries: int = MAX_RETRIES, **kwargs) -> httpx.Response:
+    """Execute an HTTP request with retry logic for transient errors (5xx, timeouts)."""
+    resp = None
+    for attempt in range(max_retries):
+        try:
+            resp = await client.request(method, url, **kwargs)
+            if resp.status_code < 500:
+                return resp
+            logger.warning("Shopee API %s %s returned %d (attempt %d/%d)", method, url, resp.status_code, attempt + 1, max_retries)
+        except httpx.TimeoutException:
+            logger.warning("Shopee API timeout %s %s (attempt %d/%d)", method, url, attempt + 1, max_retries)
+        if attempt < max_retries - 1:
+            await asyncio.sleep(RETRY_BASE_DELAY * (2 ** attempt))
+    if resp is None:
+        raise httpx.TimeoutException(f"All {max_retries} attempts failed for {method} {url}")
+    return resp
 
 
 def _make_sign(path: str, timestamp: int, access_token: str = "", shop_id: int = 0) -> str:
@@ -42,7 +64,7 @@ async def public_request(
     if params:
         base_params.update(params)
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.request(method, url, params=base_params, **kwargs)
+        resp = await _request_with_retry(client, method, url, params=base_params, **kwargs)
         data = resp.json()
         if data.get("error"):
             logger.error("Shopee API error %s %s: %s", method, path, data)
@@ -57,7 +79,7 @@ async def shop_request(
     if params:
         base_params.update(params)
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.request(method, url, params=base_params, **kwargs)
+        resp = await _request_with_retry(client, method, url, params=base_params, **kwargs)
         data = resp.json()
         if data.get("error"):
             logger.error("Shopee API error %s %s: %s", method, path, data)

@@ -43,6 +43,7 @@ class SyncStatusResponse(BaseModel):
     last_synced_at: datetime | None = None
     total_products: int = 0
     total_models: int = 0
+    token_status: str = "unknown"
 
 
 class SyncTriggerResponse(BaseModel):

@@ -1,6 +1,10 @@
+from datetime import datetime, timedelta
+
 import pytest
 
-from tests.conftest import TEST_API_KEY
+from app.config import settings
+from app.models.product import ShopeeToken, TZ_GMT7
+from tests.conftest import TEST_API_KEY, TestSession
 
 API_HEADERS = {"X-API-Key": TEST_API_KEY}
 
@@ -66,6 +70,75 @@ async def test_sync_status(client, seed_products):
     data = resp.json()
     assert data["total_products"] == 2
     assert data["total_models"] == 2
+    assert data["token_status"] in ("healthy", "expiring_soon", "expired", "missing")
+
+
+@pytest.mark.asyncio
+async def test_sync_status_token_missing(client):
+    """token_status is 'missing' when no token exists."""
+    resp = await client.get("/api/sync/status")
+    assert resp.status_code == 200
+    assert resp.json()["token_status"] == "missing"
+
+
+@pytest.mark.asyncio
+async def test_sync_status_token_healthy(client):
+    """token_status is 'healthy' when token expires in more than 24h."""
+    now = datetime.now(TZ_GMT7)
+    async with TestSession() as session:
+        token = ShopeeToken(
+            shop_id=settings.shopee_shop_id,
+            access_token="tok",
+            refresh_token="ref",
+            token_expires_at=now + timedelta(hours=48),
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(token)
+        await session.commit()
+    resp = await client.get("/api/sync/status")
+    assert resp.status_code == 200
+    assert resp.json()["token_status"] == "healthy"
+
+
+@pytest.mark.asyncio
+async def test_sync_status_token_expiring_soon(client):
+    """token_status is 'expiring_soon' when token expires within 24h."""
+    now = datetime.now(TZ_GMT7)
+    async with TestSession() as session:
+        token = ShopeeToken(
+            shop_id=settings.shopee_shop_id,
+            access_token="tok",
+            refresh_token="ref",
+            token_expires_at=now + timedelta(hours=2),
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(token)
+        await session.commit()
+    resp = await client.get("/api/sync/status")
+    assert resp.status_code == 200
+    assert resp.json()["token_status"] == "expiring_soon"
+
+
+@pytest.mark.asyncio
+async def test_sync_status_token_expired(client):
+    """token_status is 'expired' when token is past expiry."""
+    now = datetime.now(TZ_GMT7)
+    async with TestSession() as session:
+        token = ShopeeToken(
+            shop_id=settings.shopee_shop_id,
+            access_token="tok",
+            refresh_token="ref",
+            token_expires_at=now - timedelta(hours=1),
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(token)
+        await session.commit()
+    resp = await client.get("/api/sync/status")
+    assert resp.status_code == 200
+    assert resp.json()["token_status"] == "expired"
 
 
 @pytest.mark.asyncio

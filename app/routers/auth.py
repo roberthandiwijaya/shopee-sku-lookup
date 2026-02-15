@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
 from app.services.shopee_auth import exchange_code_for_token
@@ -20,7 +20,10 @@ async def callback(
     shop_id: int = Query(...),
 ):
     """Handle Shopee OAuth callback — exchange code for tokens."""
-    data = await exchange_code_for_token(code, shop_id)
+    try:
+        data = await exchange_code_for_token(code, shop_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {
         "message": "Authorization successful",
         "shop_id": shop_id,
