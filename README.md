@@ -10,23 +10,11 @@ REST API + web dashboard that syncs products from Shopee Open API v2.0 to a loca
 - **APScheduler** for periodic product sync
 - **Jinja2** + **htmx** + **Tailwind CSS** for the web dashboard (zero build tools)
 
-## Quick Start
+## Quick Start (Docker)
 
-### 1. Start databases
+The easiest way to run everything — PostgreSQL, pgAdmin, and the FastAPI app — with a single command:
 
-```bash
-docker compose up -d
-```
-
-This starts PostgreSQL (port 54558) and pgAdmin (port 5050).
-
-### 2. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Configure environment
+### 1. Configure environment
 
 ```bash
 cp .env.example .env
@@ -41,19 +29,25 @@ SHOPEE_PARTNER_KEY=your_partner_key
 SHOPEE_SHOP_ID=your_shop_id
 ```
 
-### 4. Run database migration
+### 2. Start everything
 
 ```bash
-alembic upgrade head
+docker compose up --build
 ```
 
-### 5. Start the server
+This starts all three services:
 
-```bash
-uvicorn app.main:app --reload --port 8000
-```
+| Service | URL |
+|---------|-----|
+| **FastAPI app** | http://localhost:8000 |
+| **pgAdmin** | http://localhost:5050 |
+| **PostgreSQL** | `localhost:54558` |
 
-### 6. Open the dashboard
+Database migrations are applied automatically on startup.
+
+> **Data safety:** `docker compose down` stops containers but preserves your data (the `pgdata` volume persists). Only `docker compose down -v` deletes volumes.
+
+### 3. Open the dashboard
 
 Visit `http://localhost:8000/` to access the web dashboard where you can:
 
@@ -63,11 +57,11 @@ Visit `http://localhost:8000/` to access the web dashboard where you can:
 - Trigger manual syncs
 - Re-authorize your Shopee token
 
-### 7. Authorize with Shopee
+### 4. Authorize with Shopee
 
 Click "Re-authorize" in the dashboard's auth panel, or open `http://localhost:8000/api/auth/login` — this returns a Shopee OAuth URL. Open it in your browser, authorize, and the callback will store your tokens.
 
-### 8. Sync products
+### 5. Sync products
 
 Click "Sync Now" in the dashboard, or via API:
 
@@ -77,7 +71,7 @@ curl -X POST -H "X-API-Key: your_api_key" http://localhost:8000/api/sync
 
 Products also auto-sync every 60 minutes (configurable via `SYNC_INTERVAL_MINUTES`).
 
-### 9. Query by SKU
+### 6. Query by SKU
 
 ```bash
 # Single SKU
@@ -89,6 +83,26 @@ curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1&s
 # Comma-separated
 curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1,SKU2,SKU3"
 ```
+
+## Local Development (without Docker)
+
+If you prefer running the app outside of Docker:
+
+```bash
+# Start only PostgreSQL and pgAdmin
+docker compose up -d postgres pgadmin
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run migrations
+alembic upgrade head
+
+# Start the server with hot reload
+uvicorn app.main:app --reload --port 8000
+```
+
+The `.env` file points to `localhost:54558` by default, which matches the PostgreSQL container's exposed port.
 
 ## Dashboard
 
@@ -145,7 +159,7 @@ After `docker compose up -d`, open http://localhost:5050 and login:
 - **Email:** `admin@admin.com`
 - **Password:** `admin`
 
-Add server with host `host.docker.internal`, port `54558`, user/password `postgres`.
+Add a server with host `postgres`, port `5432`, user/password `postgres`.
 
 ## Running Tests
 
