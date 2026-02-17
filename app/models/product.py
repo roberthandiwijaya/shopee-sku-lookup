@@ -88,6 +88,40 @@ class ProductModel(Base):
     product: Mapped["Product"] = relationship(back_populates="models")
 
 
+class AuthAlert(Base):
+    __tablename__ = "auth_alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    shop_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    alert_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    message: Mapped[str] = mapped_column(String(1000), nullable=False)
+    payload: Mapped[dict | None] = mapped_column(JsonType)
+    is_dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(TZ_GMT7)
+    )
+
+
+class ShopInfo(Base):
+    __tablename__ = "shop_info"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    shop_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    shop_name: Mapped[str | None] = mapped_column(String(500))
+    auth_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expire_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    raw_data: Mapped[dict | None] = mapped_column(JsonType)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(TZ_GMT7)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(TZ_GMT7),
+        onupdate=lambda: datetime.now(TZ_GMT7),
+    )
+
+
 class ShopeeToken(Base):
     __tablename__ = "shopee_tokens"
 

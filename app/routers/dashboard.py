@@ -44,11 +44,15 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
     token_details = await product_service.get_token_details(session)
     auth_url = build_auth_url()
     paginated = await product_service.list_products_paginated(session)
+    alert = await product_service.get_active_alert(session)
+    shop_info = await product_service.get_shop_info(session)
 
     return templates.TemplateResponse(request, "dashboard.html", {
         "sync_stats": sync_stats,
         "token_details": token_details,
         "auth_url": auth_url,
+        "alert": alert,
+        "shop_info": shop_info,
         **paginated,
     })
 
@@ -67,9 +71,11 @@ async def partial_auth(request: Request, session: AsyncSession = Depends(get_ses
     """Auth panel fragment (polled by htmx every 30s)."""
     token_details = await product_service.get_token_details(session)
     auth_url = build_auth_url()
+    shop_info = await product_service.get_shop_info(session)
     return templates.TemplateResponse(request, "partials/auth_panel.html", {
         "token_details": token_details,
         "auth_url": auth_url,
+        "shop_info": shop_info,
     })
 
 
@@ -109,6 +115,26 @@ async def partial_product_models(
     return templates.TemplateResponse(request, "partials/product_models.html", {
         "models": models,
     })
+
+
+@router.get("/partials/alert-banner", response_class=HTMLResponse)
+async def partial_alert_banner(request: Request, session: AsyncSession = Depends(get_session)):
+    """Alert banner fragment (polled by htmx every 30s)."""
+    alert = await product_service.get_active_alert(session)
+    auth_url = build_auth_url()
+    return templates.TemplateResponse(request, "partials/alert_banner.html", {
+        "alert": alert,
+        "auth_url": auth_url,
+    })
+
+
+@router.post("/partials/alert-dismiss/{alert_id}", response_class=HTMLResponse)
+async def partial_alert_dismiss(
+    request: Request, alert_id: int, session: AsyncSession = Depends(get_session)
+):
+    """Dismiss an alert and return empty HTML."""
+    await product_service.dismiss_alert(session, alert_id)
+    return HTMLResponse("")
 
 
 @router.post("/partials/sync-trigger", response_class=HTMLResponse)

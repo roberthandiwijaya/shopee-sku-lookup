@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.routers import auth, dashboard, products
+from app.routers import auth, dashboard, products, webhook
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -26,3 +26,4 @@ app = FastAPI(
 app.include_router(dashboard.router)
 app.include_router(products.router)
 app.include_router(auth.router)
+app.include_router(webhook.router)

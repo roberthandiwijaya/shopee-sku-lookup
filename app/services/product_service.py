@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.models.product import Product, ProductModel, ShopeeToken, TZ_GMT7
+from app.models.product import AuthAlert, Product, ProductModel, ShopeeToken, ShopInfo, TZ_GMT7
 from app.schemas.product import ProductOut, ProductSearchResponse
 
 
@@ -143,6 +143,39 @@ async def get_token_details(session: AsyncSession) -> dict:
         "expires_at": expires_at,
         "expires_in_hours": round(hours_left, 1),
     }
+
+
+async def get_active_alert(session: AsyncSession) -> AuthAlert | None:
+    """Return the latest non-dismissed AuthAlert for the configured shop, or None."""
+    result = await session.execute(
+        select(AuthAlert)
+        .where(
+            AuthAlert.shop_id == settings.shopee_shop_id,
+            AuthAlert.is_dismissed == False,
+        )
+        .order_by(AuthAlert.created_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def dismiss_alert(session: AsyncSession, alert_id: int) -> None:
+    """Mark an alert as dismissed."""
+    result = await session.execute(
+        select(AuthAlert).where(AuthAlert.id == alert_id)
+    )
+    alert = result.scalar_one_or_none()
+    if alert:
+        alert.is_dismissed = True
+        await session.commit()
+
+
+async def get_shop_info(session: AsyncSession) -> ShopInfo | None:
+    """Read shop info from DB for the configured shop."""
+    result = await session.execute(
+        select(ShopInfo).where(ShopInfo.shop_id == settings.shopee_shop_id)
+    )
+    return result.scalar_one_or_none()
 
 
 async def _get_token_status(session: AsyncSession) -> str:

@@ -20,6 +20,27 @@
             <span class="text-sm font-mono text-gray-700">{{ token_details.shop_id }}</span>
         </div>
 
+        {% if shop_info and shop_info.shop_name %}
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Shop Name</span>
+            <span class="text-sm text-gray-700">{{ shop_info.shop_name }}</span>
+        </div>
+        {% endif %}
+
+        {% if shop_info and shop_info.auth_time %}
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Auth Time</span>
+            <span class="text-sm text-gray-700">{{ shop_info.auth_time | wib }}</span>
+        </div>
+        {% endif %}
+
+        {% if shop_info and shop_info.expire_time %}
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">Auth Expires</span>
+            <span class="text-sm text-gray-700">{{ shop_info.expire_time | wib }}</span>
+        </div>
+        {% endif %}
+
         {% if token_details.expires_at %}
         <div class="flex items-center justify-between">
             <span class="text-sm text-gray-500">Expires</span>

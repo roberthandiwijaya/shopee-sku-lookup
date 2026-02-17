@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import async_session
-from app.models.product import ShopeeToken
+from app.models.product import ShopeeToken, ShopInfo
 from app.services import shopee_client
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,56 @@ async def refresh_token_if_needed(shop_id: int) -> str | None:
 async def get_valid_token(shop_id: int) -> str | None:
     """Get a valid access token, refreshing if necessary."""
     return await refresh_token_if_needed(shop_id)
+
+
+async def fetch_shop_info(shop_id: int, access_token: str) -> None:
+    """Fetch shop info from Shopee API and upsert into DB. Called once after OAuth callback."""
+    try:
+        data = await shopee_client.shop_request(
+            "/api/v2/shop/get_shop_info",
+            access_token=access_token,
+            shop_id=shop_id,
+        )
+        if data.get("error"):
+            logger.error("Failed to fetch shop info for shop %d: %s", shop_id, data)
+            return
+
+        shop_name = data.get("shop_name")
+        auth_time_ts = data.get("auth_time")
+        expire_time_ts = data.get("expire_time")
+
+        auth_time = datetime.fromtimestamp(auth_time_ts, tz=TZ_GMT7) if auth_time_ts else None
+        expire_time = datetime.fromtimestamp(expire_time_ts, tz=TZ_GMT7) if expire_time_ts else None
+
+        async with async_session() as session:
+            result = await session.execute(
+                select(ShopInfo).where(ShopInfo.shop_id == shop_id)
+            )
+            info = result.scalar_one_or_none()
+            now = datetime.now(TZ_GMT7)
+
+            if info is None:
+                info = ShopInfo(
+                    shop_id=shop_id,
+                    shop_name=shop_name,
+                    auth_time=auth_time,
+                    expire_time=expire_time,
+                    raw_data=data,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(info)
+            else:
+                info.shop_name = shop_name
+                info.auth_time = auth_time
+                info.expire_time = expire_time
+                info.raw_data = data
+                info.updated_at = now
+
+            await session.commit()
+        logger.info("Shop info saved for shop %d: %s", shop_id, shop_name)
+    except Exception:
+        logger.exception("Error fetching shop info for shop %d", shop_id)
 
 
 async def _get_token(session: AsyncSession, shop_id: int) -> ShopeeToken | None:

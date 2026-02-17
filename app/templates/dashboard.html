@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div id="alert-banner-container"
+     hx-get="/partials/alert-banner"
+     hx-trigger="every 30s"
+     hx-swap="innerHTML">
+    {% include "partials/alert_banner.html" %}
+</div>
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
     <!-- Sync Status Panel (2/3 width) -->
     <div class="lg:col-span-2">
