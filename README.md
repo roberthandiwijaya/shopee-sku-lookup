@@ -89,6 +89,10 @@ curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1&s
 curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1,SKU2,SKU3"
 ```
 
+## Production Deployment
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for a step-by-step guide to deploy on an Ubuntu or OpenCloudOS VPS.
+
 ## Local Development (without Docker)
 
 If you prefer running the app outside of Docker:
