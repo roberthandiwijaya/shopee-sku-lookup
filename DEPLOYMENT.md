@@ -42,6 +42,9 @@ echo \
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+# Start and enable Docker
+sudo systemctl enable --now docker
+
 # Verify
 docker --version
 docker compose version
