@@ -1,15 +1,19 @@
-# Production Deployment Guide (Ubuntu VPS)
+# Production Deployment Guide
 
-Deploy the Shopee SKU Lookup app on an Ubuntu VPS, accessible via IP address.
+Deploy the Shopee SKU Lookup app on a VPS, accessible via IP address.
+
+Supported distros:
+- [Ubuntu 22.04 / 24.04](#2a-server-setup-ubuntu)
+- [OpenCloudOS / RHEL-based](#2b-server-setup-opencloudos--rhel-based)
 
 ---
 
 ## 1. Prerequisites
 
-- Ubuntu 22.04 or 24.04 VPS (minimum 1 vCPU, 1 GB RAM)
+- VPS with a supported Linux distro (minimum 1 vCPU, 1 GB RAM)
 - SSH access as root or a sudo user
 
-## 2. Server Setup
+## 2a. Server Setup (Ubuntu)
 
 ### Update system packages
 
@@ -56,6 +60,53 @@ sudo usermod -aG docker $USER
 sudo ufw allow OpenSSH
 sudo ufw allow 8000
 sudo ufw enable
+```
+
+> **Next:** Skip to [Section 3 — Deploy the App](#3-deploy-the-app).
+
+## 2b. Server Setup (OpenCloudOS / RHEL-based)
+
+These instructions also work for CentOS Stream, Rocky Linux, AlmaLinux, and other RHEL-based distros.
+
+### Update system packages
+
+```bash
+sudo dnf update -y
+```
+
+### Install Docker + Docker Compose plugin
+
+```bash
+# Install yum-utils (provides yum-config-manager)
+sudo dnf install -y yum-utils
+
+# Add Docker's official repository (uses the CentOS repo, compatible with RHEL-based distros)
+sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+# Install Docker
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Start and enable Docker
+sudo systemctl enable --now docker
+
+# Verify
+docker --version
+docker compose version
+```
+
+### Allow your user to run Docker without sudo (optional)
+
+```bash
+sudo usermod -aG docker $USER
+# Log out and back in for this to take effect
+```
+
+### Open firewall port
+
+```bash
+sudo firewall-cmd --permanent --add-port=8000/tcp
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --reload
 ```
 
 ## 3. Deploy the App
