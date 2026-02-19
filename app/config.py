@@ -16,6 +16,8 @@ class Settings(BaseSettings):
 
     api_key: str = ""
 
+    session_secret_key: str = "change-me-in-production"
+
     sync_interval_minutes: int = 60
 
     model_config = {"env_file": str(ENV_FILE), "env_file_encoding": "utf-8"}

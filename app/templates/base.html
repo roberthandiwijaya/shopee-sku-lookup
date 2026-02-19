@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Shopee SKU Dashboard{% endblock %}</title>
+    <title>{% block title %}Idola Style - Shopee SKU Dashboard{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <style>
@@ -16,10 +16,15 @@
     <nav class="bg-orange-500 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <span class="text-white text-xl font-bold">Shopee SKU Dashboard</span>
+                <span class="text-white text-xl font-bold">Idola Style - Shopee SKU Dashboard</span>
             </div>
             <div class="flex items-center space-x-4">
                 <a href="/docs" target="_blank" class="text-orange-100 hover:text-white text-sm">API Docs</a>
+                {% if request.session.get("username") %}
+                <span class="text-orange-100 text-sm">{{ request.session["username"] }}</span>
+                <a href="/change-password" class="text-orange-100 hover:text-white text-sm">Change Password</a>
+                <a href="/logout" class="bg-orange-600 hover:bg-orange-700 text-white text-sm px-3 py-1 rounded">Logout</a>
+                {% endif %}
             </div>
         </div>
     </nav>

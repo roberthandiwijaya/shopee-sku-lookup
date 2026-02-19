@@ -122,6 +122,24 @@ class ShopInfo(Base):
     )
 
 
+class DashboardUser(Base):
+    __tablename__ = "dashboard_users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String(500), nullable=False)
+    salt: Mapped[str] = mapped_column(String(64), nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(TZ_GMT7)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(TZ_GMT7),
+        onupdate=lambda: datetime.now(TZ_GMT7),
+    )
+
+
 class ShopeeToken(Base):
     __tablename__ = "shopee_tokens"
 

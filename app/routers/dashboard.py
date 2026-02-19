@@ -12,11 +12,12 @@ from sqlalchemy.orm import selectinload
 from app.database import get_session
 from app.models.product import Product
 from app.services import product_service
+from app.services.dashboard_auth import require_login
 from app.services.shopee_client import build_auth_url
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["dashboard"])
+router = APIRouter(tags=["dashboard"], dependencies=[Depends(require_login)])
 
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
 
