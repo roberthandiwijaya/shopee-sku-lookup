@@ -47,9 +47,14 @@ Database migrations are applied automatically on startup.
 
 > **Data safety:** `docker compose down` stops containers but preserves your data (the `pgdata` volume persists). Only `docker compose down -v` deletes volumes.
 
-### 3. Open the dashboard
+### 3. Login to the dashboard
 
-Visit `http://localhost:8000/` to access the web dashboard where you can:
+Visit `http://localhost:8000/` — you'll be redirected to the login page.
+
+- **Default credentials:** `admin` / `admin`
+- On first login you'll be prompted to change your password
+
+After login you can:
 
 - Monitor sync status and token health at a glance
 - Browse and search products by SKU
@@ -120,7 +125,12 @@ All interactions use htmx for seamless partial updates without full page reloads
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| GET | `/` | — | Web dashboard |
+| GET | `/` | Session | Web dashboard |
+| GET | `/login` | — | Login page |
+| POST | `/login` | — | Login submit |
+| GET | `/logout` | — | Logout (clears session) |
+| GET | `/change-password` | Session | Change password page |
+| POST | `/change-password` | Session | Change password submit |
 | GET | `/api/products?sku=...` | `X-API-Key` | SKU lookup (single, multiple, or comma-separated) |
 | POST | `/api/sync` | `X-API-Key` | Trigger manual product sync |
 | GET | `/api/sync/status` | — | Check last sync time and counts |
@@ -180,4 +190,5 @@ Tests use SQLite (no PostgreSQL required).
 | `SHOPEE_SHOP_ID` | Shopee shop ID | — |
 | `SHOPEE_BASE_URL` | Shopee API base URL | `https://openplatform.sandbox.test-stable.shopee.sg` |
 | `SHOPEE_REDIRECT_URL` | OAuth callback URL | `http://localhost:8000/api/auth/callback` |
+| `SESSION_SECRET_KEY` | Secret key for session cookies | `change-me-in-production` |
 | `SYNC_INTERVAL_MINUTES` | Auto-sync interval | `60` |
