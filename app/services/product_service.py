@@ -73,6 +73,7 @@ async def list_products_paginated(
             base.outerjoin(Product.models)
             .where(
                 or_(
+                    Product.item_name.ilike(pattern),
                     Product.item_sku.ilike(pattern),
                     ProductModel.model_sku.ilike(pattern),
                 )

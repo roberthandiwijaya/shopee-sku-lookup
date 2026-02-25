@@ -1,0 +1,83 @@
+<div class="bg-white rounded-lg shadow">
+    <div class="p-6 border-b">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-800">Discounts</h2>
+                <div class="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                    <span>{{ discount_stats.ongoing }} ongoing</span>
+                    <span>{{ discount_stats.upcoming }} upcoming</span>
+                    <span>
+                        Last synced:
+                        {% if discount_stats.last_synced_at %}
+                            {{ discount_stats.last_synced_at | wib }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button hx-post="/partials/discount-sync-trigger"
+                        hx-target="#discount-sync-result"
+                        hx-swap="innerHTML"
+                        hx-indicator="#discount-sync-spinner"
+                        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
+                    Sync Discounts
+                </button>
+                <span id="discount-sync-spinner" class="htmx-indicator">
+                    <svg class="animate-spin h-5 w-5 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </span>
+                <div id="discount-sync-result"></div>
+            </div>
+        </div>
+
+        <!-- Status filter tabs -->
+        <div class="flex gap-2">
+            <button hx-get="/partials/discounts"
+                    hx-target="#discount-tbody"
+                    hx-swap="innerHTML"
+                    class="px-3 py-1 text-sm rounded-full bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 transition-colors">
+                All
+            </button>
+            <button hx-get="/partials/discounts?status=ongoing"
+                    hx-target="#discount-tbody"
+                    hx-swap="innerHTML"
+                    class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                Ongoing
+            </button>
+            <button hx-get="/partials/discounts?status=upcoming"
+                    hx-target="#discount-tbody"
+                    hx-swap="innerHTML"
+                    class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                Upcoming
+            </button>
+            <button hx-get="/partials/discounts?status=expired"
+                    hx-target="#discount-tbody"
+                    hx-swap="innerHTML"
+                    class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                Expired
+            </button>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+                <tr>
+                    <th class="px-6 py-3 text-left w-8"></th>
+                    <th class="px-6 py-3 text-left">Discount Name</th>
+                    <th class="px-6 py-3 text-left">Status</th>
+                    <th class="px-6 py-3 text-left">Start Time</th>
+                    <th class="px-6 py-3 text-left">End Time</th>
+                    <th class="px-6 py-3 text-right">Items</th>
+                </tr>
+            </thead>
+            <tbody id="discount-tbody">
+                {% include "partials/discount_rows.html" %}
+            </tbody>
+        </table>
+    </div>
+</div>

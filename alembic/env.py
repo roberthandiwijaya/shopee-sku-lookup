@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import settings
 from app.models.product import Base
+import app.models.discount  # noqa: F401 — registers Discount/DiscountItem with Base.metadata
 
 config = context.config
 if config.config_file_name is not None:

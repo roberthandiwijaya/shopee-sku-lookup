@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_session
+from app.models.discount import Discount
 from app.models.product import Product
-from app.services import product_service
+from app.services import discount_service, product_service
 from app.services.dashboard_auth import require_login
 from app.services.shopee_client import build_auth_url
 
@@ -55,6 +56,22 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         "alert": alert,
         "shop_info": shop_info,
         **paginated,
+    })
+
+
+@router.get("/discounts", response_class=HTMLResponse)
+async def discounts_page(request: Request, session: AsyncSession = Depends(get_session)):
+    """Discounts page — full HTML layout."""
+    discount_stats = await discount_service.get_discount_sync_stats(session)
+    discount_paginated = await discount_service.list_discounts(session)
+
+    return templates.TemplateResponse(request, "discounts.html", {
+        "discount_stats": discount_stats,
+        "discount_page": discount_paginated["page"],
+        "discount_total": discount_paginated["total"],
+        "discount_total_pages": discount_paginated["total_pages"],
+        "discount_status": None,
+        "discounts": discount_paginated["discounts"],
     })
 
 
@@ -151,6 +168,58 @@ async def partial_sync_trigger(request: Request):
         logger.exception("Manual sync failed")
         status = "error"
         message = f"Sync failed: {e}"
+
+    return templates.TemplateResponse(request, "partials/sync_result.html", {
+        "status": status,
+        "message": message,
+    })
+
+
+@router.get("/partials/discounts", response_class=HTMLResponse)
+async def partial_discounts(
+    request: Request,
+    page: int = 1,
+    status: str = "",
+    session: AsyncSession = Depends(get_session),
+):
+    """Discount rows fragment (htmx filter + pagination)."""
+    paginated = await discount_service.list_discounts(
+        session, page=page, per_page=25, status_filter=status or None
+    )
+    return templates.TemplateResponse(request, "partials/discount_rows.html", {
+        "discount_page": paginated["page"],
+        "discount_total": paginated["total"],
+        "discount_total_pages": paginated["total_pages"],
+        "discount_status": status or None,
+        "discounts": paginated["discounts"],
+    })
+
+
+@router.get("/partials/discounts/{discount_id}/items", response_class=HTMLResponse)
+async def partial_discount_items(
+    request: Request,
+    discount_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Expandable items sub-table for a single discount."""
+    discount = await discount_service.get_discount_detail(session, discount_id)
+    items = discount.items if discount else []
+    return templates.TemplateResponse(request, "partials/discount_items.html", {
+        "items": items,
+    })
+
+
+@router.post("/partials/discount-sync-trigger", response_class=HTMLResponse)
+async def partial_discount_sync_trigger(request: Request):
+    """Trigger a manual discount sync and return feedback fragment."""
+    try:
+        synced_count = await discount_service.sync_discounts()
+        status = "success"
+        message = f"Discount sync completed: {synced_count} discounts synced"
+    except Exception as e:
+        logger.exception("Manual discount sync failed")
+        status = "error"
+        message = f"Discount sync failed: {e}"
 
     return templates.TemplateResponse(request, "partials/sync_result.html", {
         "status": status,

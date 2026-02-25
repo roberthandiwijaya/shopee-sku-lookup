@@ -15,8 +15,12 @@
 <body class="bg-gray-50 min-h-screen">
     <nav class="bg-orange-500 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-6">
                 <span class="text-white text-xl font-bold">Idola Style - Shopee SKU Dashboard</span>
+                {% if request.session.get("username") %}
+                <a href="/" class="text-orange-100 hover:text-white text-sm font-medium {% if request.url.path == '/' %}border-b-2 border-white pb-0.5{% endif %}">Dashboard</a>
+                <a href="/discounts" class="text-orange-100 hover:text-white text-sm font-medium {% if request.url.path.startswith('/discounts') %}border-b-2 border-white pb-0.5{% endif %}">Discounts</a>
+                {% endif %}
             </div>
             <div class="flex items-center space-x-4">
                 <a href="/docs" target="_blank" class="text-orange-100 hover:text-white text-sm">API Docs</a>

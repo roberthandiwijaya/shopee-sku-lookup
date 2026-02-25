@@ -1,0 +1,78 @@
+{% for discount in discounts %}
+<tr class="border-b hover:bg-gray-50">
+    <td class="px-6 py-3">
+        <button class="text-gray-400 hover:text-blue-500 transition-colors"
+                onclick="
+                    var svg = this.querySelector('svg');
+                    var target = document.getElementById('discount-items-{{ discount.discount_id }}');
+                    if (target.innerHTML.trim()) {
+                        target.innerHTML = '';
+                        svg.classList.remove('rotate-90');
+                    } else {
+                        svg.classList.add('rotate-90');
+                        htmx.ajax('GET', '/partials/discounts/{{ discount.discount_id }}/items', {target: target, swap: 'innerHTML'});
+                    }
+                ">
+            <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </button>
+    </td>
+    <td class="px-6 py-3 font-medium text-gray-800 max-w-xs truncate" title="{{ discount.discount_name }}">
+        {{ discount.discount_name or '-' }}
+    </td>
+    <td class="px-6 py-3">
+        {% if discount.discount_status == "ongoing" %}
+            <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Ongoing</span>
+        {% elif discount.discount_status == "upcoming" %}
+            <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">Upcoming</span>
+        {% elif discount.discount_status == "expired" %}
+            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">Expired</span>
+        {% else %}
+            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">{{ discount.discount_status or '-' }}</span>
+        {% endif %}
+    </td>
+    <td class="px-6 py-3 text-gray-600 text-xs">{{ discount.start_time | wib }}</td>
+    <td class="px-6 py-3 text-gray-600 text-xs">{{ discount.end_time | wib }}</td>
+    <td class="px-6 py-3 text-right text-gray-700">{{ discount.items | length }}</td>
+</tr>
+<tr id="discount-items-row-{{ discount.discount_id }}">
+    <td colspan="6" class="p-0">
+        <div id="discount-items-{{ discount.discount_id }}"></div>
+    </td>
+</tr>
+{% else %}
+<tr>
+    <td colspan="6" class="px-6 py-8 text-center text-gray-400">No discounts found.</td>
+</tr>
+{% endfor %}
+
+{% if discount_total_pages > 1 %}
+<tr>
+    <td colspan="6" class="px-6 py-4">
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500">
+                Page {{ discount_page }} of {{ discount_total_pages }} ({{ discount_total }} discounts)
+            </span>
+            <div class="flex space-x-2">
+                {% if discount_page > 1 %}
+                <button hx-get="/partials/discounts?page={{ discount_page - 1 }}{% if discount_status %}&status={{ discount_status }}{% endif %}"
+                        hx-target="#discount-tbody"
+                        hx-swap="innerHTML"
+                        class="px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors">
+                    Previous
+                </button>
+                {% endif %}
+                {% if discount_page < discount_total_pages %}
+                <button hx-get="/partials/discounts?page={{ discount_page + 1 }}{% if discount_status %}&status={{ discount_status }}{% endif %}"
+                        hx-target="#discount-tbody"
+                        hx-swap="innerHTML"
+                        class="px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors">
+                    Next
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+</tr>
+{% endif %}
