@@ -3,17 +3,19 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.database import get_session
 from app.models.discount import Discount
 from app.models.product import Product
 from app.services import discount_service, product_service
 from app.services.dashboard_auth import require_login
+from app.services.shopee_auth import get_valid_token
 from app.services.shopee_client import build_auth_url
 
 logger = logging.getLogger(__name__)
@@ -203,10 +205,100 @@ async def partial_discount_items(
 ):
     """Expandable items sub-table for a single discount."""
     discount = await discount_service.get_discount_detail(session, discount_id)
-    items = discount.items if discount else []
+    items = await discount_service.get_enriched_discount_items(session, discount.id) if discount else []
     return templates.TemplateResponse(request, "partials/discount_items.html", {
         "items": items,
     })
+
+
+@router.get("/discounts/{discount_id}/edit", response_class=HTMLResponse)
+async def discount_edit_page(
+    request: Request,
+    discount_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Edit page for a single discount."""
+    discount = await discount_service.get_discount_detail(session, discount_id)
+    if not discount:
+        return HTMLResponse("Discount not found", status_code=404)
+    items = await discount_service.get_enriched_discount_items(session, discount.id)
+    return templates.TemplateResponse(request, "discounts_edit.html", {
+        "discount": discount,
+        "items": items,
+    })
+
+
+@router.post("/discounts/{discount_id}/edit")
+async def discount_edit_submit(
+    request: Request,
+    discount_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Submit edits for a discount."""
+    discount = await discount_service.get_discount_detail(session, discount_id)
+    if not discount:
+        return HTMLResponse("Discount not found", status_code=404)
+
+    form = await request.form()
+    access_token = await get_valid_token(settings.shopee_shop_id)
+
+    # Update basic info
+    discount_name = form.get("discount_name")
+    end_time_str = form.get("end_time")
+    end_time_ts = None
+    if end_time_str:
+        try:
+            parsed = datetime.fromisoformat(end_time_str)
+            end_time_ts = int(parsed.timestamp())
+        except ValueError:
+            pass
+
+    await discount_service.update_discount(
+        settings.shopee_shop_id,
+        access_token,
+        discount_id,
+        name=discount_name,
+        end_time=end_time_ts,
+    )
+
+    # Build item_list from form fields
+    enriched = await discount_service.get_enriched_discount_items(session, discount.id)
+    item_list = []
+    for item in enriched:
+        di_id = item["discount_item_id"]
+        price_key = f"price_{di_id}"
+        limit_key = f"limit_{di_id}"
+        price_val = form.get(price_key)
+        limit_val = form.get(limit_key)
+        if price_val is not None:
+            entry = {
+                "item_id": item["shopee_item_id"],
+                "item_promotion_price": float(price_val),
+            }
+            if item["shopee_model_id"] != 0:
+                entry["model_id"] = item["shopee_model_id"]
+            if limit_val:
+                entry["purchase_limit"] = int(limit_val)
+            item_list.append(entry)
+
+    if item_list:
+        await discount_service.update_discount_items(
+            settings.shopee_shop_id, access_token, discount_id, item_list
+        )
+
+    return RedirectResponse("/discounts", status_code=303)
+
+
+@router.post("/discounts/{discount_id}/delete")
+async def discount_delete(
+    request: Request,
+    discount_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Delete a discount."""
+    access_token = await get_valid_token(settings.shopee_shop_id)
+    await discount_service.delete_discount(settings.shopee_shop_id, access_token, discount_id)
+    return RedirectResponse("/discounts", status_code=303)
 
 
 @router.post("/partials/discount-sync-trigger", response_class=HTMLResponse)

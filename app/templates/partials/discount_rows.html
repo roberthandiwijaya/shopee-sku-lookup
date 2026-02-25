@@ -21,6 +21,9 @@
     <td class="px-6 py-3 font-medium text-gray-800 max-w-xs truncate" title="{{ discount.discount_name }}">
         {{ discount.discount_name or '-' }}
     </td>
+    <td class="px-6 py-3 font-mono text-xs text-gray-500">
+        {{ discount.discount_id }}
+    </td>
     <td class="px-6 py-3">
         {% if discount.discount_status == "ongoing" %}
             <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Ongoing</span>
@@ -35,21 +38,43 @@
     <td class="px-6 py-3 text-gray-600 text-xs">{{ discount.start_time | wib }}</td>
     <td class="px-6 py-3 text-gray-600 text-xs">{{ discount.end_time | wib }}</td>
     <td class="px-6 py-3 text-right text-gray-700">{{ discount.items | length }}</td>
+    <td class="px-6 py-3">
+        <div class="flex items-center gap-2 justify-end">
+            <a href="/discounts/{{ discount.discount_id }}/edit"
+               class="text-blue-500 hover:text-blue-700 transition-colors"
+               title="Edit">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+            </a>
+            <form method="POST" action="/discounts/{{ discount.discount_id }}/delete"
+                  onsubmit="return confirm('Delete discount \'{{ discount.discount_name }}\'?')"
+                  class="inline">
+                <button type="submit" class="text-red-400 hover:text-red-600 transition-colors" title="Delete">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </td>
 </tr>
 <tr id="discount-items-row-{{ discount.discount_id }}">
-    <td colspan="6" class="p-0">
+    <td colspan="8" class="p-0">
         <div id="discount-items-{{ discount.discount_id }}"></div>
     </td>
 </tr>
 {% else %}
 <tr>
-    <td colspan="6" class="px-6 py-8 text-center text-gray-400">No discounts found.</td>
+    <td colspan="8" class="px-6 py-8 text-center text-gray-400">No discounts found.</td>
 </tr>
 {% endfor %}
 
 {% if discount_total_pages > 1 %}
 <tr>
-    <td colspan="6" class="px-6 py-4">
+    <td colspan="8" class="px-6 py-4">
         <div class="flex items-center justify-between">
             <span class="text-sm text-gray-500">
                 Page {{ discount_page }} of {{ discount_total_pages }} ({{ discount_total }} discounts)

@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Discount — {{ discount.discount_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Back link -->
+    <div>
+        <a href="/discounts" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 transition-colors">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Back to Discounts
+        </a>
+    </div>
+
+    <form method="POST" action="/discounts/{{ discount.discount_id }}/edit">
+
+        <!-- Basic Information -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Basic Information</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Promotion Name -->
+                <div class="md:col-span-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Promotion Name</label>
+                    <input type="text"
+                           name="discount_name"
+                           value="{{ discount.discount_name or '' }}"
+                           class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+
+                <!-- Start Time (read-only) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Start Time
+                        {% if discount.discount_status == "ongoing" %}
+                        <span class="ml-1 text-xs text-gray-400">(cannot change while ongoing)</span>
+                        {% endif %}
+                    </label>
+                    <input type="text"
+                           value="{{ discount.start_time | wib }}"
+                           readonly
+                           class="w-full border border-gray-200 rounded px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed">
+                </div>
+
+                <!-- End Time (editable) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <input type="datetime-local"
+                           name="end_time"
+                           value="{% if discount.end_time %}{{ discount.end_time.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"
+                           class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                </div>
+            </div>
+
+            <div class="mt-2 flex items-center gap-2 text-sm">
+                <span class="text-gray-500">Status:</span>
+                {% if discount.discount_status == "ongoing" %}
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">Ongoing</span>
+                {% elif discount.discount_status == "upcoming" %}
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800">Upcoming</span>
+                {% elif discount.discount_status == "expired" %}
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">Expired</span>
+                {% else %}
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{{ discount.discount_status }}</span>
+                {% endif %}
+                <span class="text-gray-400 font-mono text-xs ml-2">ID: {{ discount.discount_id }}</span>
+            </div>
+        </div>
+
+        <!-- Product Information -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Product Information</h2>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+                        <tr>
+                            <th class="px-4 py-3 text-left">Product</th>
+                            <th class="px-4 py-3 text-left">Variation</th>
+                            <th class="px-4 py-3 text-left">SKU</th>
+                            <th class="px-4 py-3 text-right">Original Price</th>
+                            <th class="px-4 py-3 text-right w-28">Discount %</th>
+                            <th class="px-4 py-3 text-right w-36">Discounted Price</th>
+                            <th class="px-4 py-3 text-right w-28">Purchase Limit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for i in items %}
+                        {# hidden fields for item/model identity #}
+                        <input type="hidden" name="item_id_{{ i.discount_item_id }}" value="{{ i.shopee_item_id }}">
+                        <input type="hidden" name="model_id_{{ i.discount_item_id }}" value="{{ i.shopee_model_id }}">
+
+                        <tr class="border-b last:border-0 hover:bg-gray-50"
+                            data-orig="{{ i.original_price if i.original_price is not none else '' }}">
+                            <!-- Product -->
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                    {% if i.product_image %}
+                                    <img src="{{ i.product_image }}"
+                                         alt=""
+                                         class="w-10 h-10 object-cover rounded flex-shrink-0"
+                                         onerror="this.style.display='none'">
+                                    {% else %}
+                                    <div class="w-10 h-10 bg-gray-100 rounded flex-shrink-0 flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                        </svg>
+                                    </div>
+                                    {% endif %}
+                                    <span class="font-medium text-gray-800 text-xs leading-tight max-w-xs" title="{{ i.product_name }}">
+                                        {{ i.product_name }}
+                                    </span>
+                                </div>
+                            </td>
+                            <!-- Variation -->
+                            <td class="px-4 py-3 text-gray-600 text-xs">
+                                {% if i.model_name %}
+                                    {{ i.model_name }}
+                                {% else %}
+                                    <span class="text-gray-400 italic">(item-level)</span>
+                                {% endif %}
+                            </td>
+                            <!-- SKU -->
+                            <td class="px-4 py-3 font-mono text-xs text-gray-500">
+                                {{ i.model_sku or '-' }}
+                            </td>
+                            <!-- Original Price -->
+                            <td class="px-4 py-3 text-right text-gray-700 text-xs">
+                                {% if i.original_price is not none %}
+                                    {{ "{:,.0f}".format(i.original_price) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <!-- Discount % -->
+                            <td class="px-4 py-3 text-right">
+                                <input type="number"
+                                       name="pct_{{ i.discount_item_id }}"
+                                       value="{{ i.discount_pct if i.discount_pct is not none else '' }}"
+                                       min="0" max="99" step="1"
+                                       class="pct-input w-20 border border-gray-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                       data-di-id="{{ i.discount_item_id }}"
+                                       placeholder="%">
+                            </td>
+                            <!-- Discounted Price -->
+                            <td class="px-4 py-3 text-right">
+                                <input type="number"
+                                       name="price_{{ i.discount_item_id }}"
+                                       value="{{ i.item_promotion_price if i.item_promotion_price is not none else '' }}"
+                                       min="0" step="1"
+                                       class="price-input w-32 border border-gray-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                       data-di-id="{{ i.discount_item_id }}"
+                                       placeholder="Price">
+                            </td>
+                            <!-- Purchase Limit -->
+                            <td class="px-4 py-3 text-right">
+                                <input type="number"
+                                       name="limit_{{ i.discount_item_id }}"
+                                       value="{{ i.purchase_limit if i.purchase_limit is not none else '' }}"
+                                       min="0" step="1"
+                                       class="w-24 border border-gray-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                       placeholder="No limit">
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-400">No items found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex justify-end mt-4">
+            <a href="/discounts"
+               class="mr-3 px-5 py-2 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                Cancel
+            </a>
+            <button type="submit"
+                    class="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded transition-colors">
+                Save Changes
+            </button>
+        </div>
+
+    </form>
+</div>
+
+<script>
+(function () {
+    function getOriginalPrice(diId) {
+        // The tr row has data-orig; find it via any input with data-di-id
+        var pctInput = document.querySelector('.pct-input[data-di-id="' + diId + '"]');
+        if (!pctInput) return null;
+        var row = pctInput.closest('tr');
+        if (!row) return null;
+        var orig = parseFloat(row.getAttribute('data-orig'));
+        return isNaN(orig) ? null : orig;
+    }
+
+    document.querySelectorAll('.pct-input').forEach(function (pctEl) {
+        pctEl.addEventListener('input', function () {
+            var diId = this.getAttribute('data-di-id');
+            var orig = getOriginalPrice(diId);
+            if (orig === null) return;
+            var pct = parseFloat(this.value);
+            if (isNaN(pct)) return;
+            var price = Math.round(orig * (1 - pct / 100));
+            var priceEl = document.querySelector('.price-input[data-di-id="' + diId + '"]');
+            if (priceEl) priceEl.value = price;
+        });
+    });
+
+    document.querySelectorAll('.price-input').forEach(function (priceEl) {
+        priceEl.addEventListener('input', function () {
+            var diId = this.getAttribute('data-di-id');
+            var orig = getOriginalPrice(diId);
+            if (orig === null || orig === 0) return;
+            var price = parseFloat(this.value);
+            if (isNaN(price)) return;
+            var pct = Math.round((1 - price / orig) * 100);
+            var pctEl = document.querySelector('.pct-input[data-di-id="' + diId + '"]');
+            if (pctEl) pctEl.value = pct;
+        });
+    });
+})();
+</script>
+{% endblock %}

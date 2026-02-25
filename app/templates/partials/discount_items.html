@@ -2,37 +2,59 @@
     <table class="w-full text-sm">
         <thead class="text-xs text-gray-500 uppercase">
             <tr>
-                <th class="px-4 py-2 text-left">Item ID</th>
-                <th class="px-4 py-2 text-left">Model ID</th>
-                <th class="px-4 py-2 text-right">Promotion Price</th>
+                <th class="px-4 py-2 text-left">Product Name</th>
+                <th class="px-4 py-2 text-left">Variation</th>
+                <th class="px-4 py-2 text-left">SKU</th>
+                <th class="px-4 py-2 text-right">Original Price</th>
+                <th class="px-4 py-2 text-right">Discount %</th>
+                <th class="px-4 py-2 text-right">Promo Price</th>
                 <th class="px-4 py-2 text-right">Purchase Limit</th>
             </tr>
         </thead>
         <tbody>
             {% for item in items %}
             <tr class="border-b border-blue-100 last:border-0">
-                <td class="px-4 py-2 font-mono text-gray-700">{{ item.shopee_item_id }}</td>
-                <td class="px-4 py-2 font-mono text-gray-600">
-                    {% if item.shopee_model_id == 0 %}
-                        <span class="text-gray-400 italic">(item-level)</span>
+                <td class="px-4 py-2 text-gray-800 font-medium max-w-xs truncate" title="{{ item.product_name }}">
+                    {{ item.product_name }}
+                </td>
+                <td class="px-4 py-2 text-gray-600">
+                    {% if item.model_name %}
+                        {{ item.model_name }}
                     {% else %}
-                        {{ item.shopee_model_id }}
+                        <span class="text-gray-400 italic">(item-level)</span>
                     {% endif %}
                 </td>
+                <td class="px-4 py-2 font-mono text-gray-600 text-xs">
+                    {{ item.model_sku or '-' }}
+                </td>
                 <td class="px-4 py-2 text-right text-gray-700">
-                    {% if item.item_promotion_price is not none %}
-                        {{ "%.2f" | format(item.item_promotion_price | float) }}
+                    {% if item.original_price is not none %}
+                        {{ "{:,.0f}".format(item.original_price) }}
                     {% else %}
                         -
                     {% endif %}
                 </td>
                 <td class="px-4 py-2 text-right text-gray-700">
-                    {{ item.purchase_limit if item.purchase_limit is not none else '-' }}
+                    {% if item.discount_pct is not none %}
+                        {{ item.discount_pct }}%
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="px-4 py-2 text-right text-gray-700">
+                    {% if item.item_promotion_price is not none %}
+                        {{ "{:,.0f}".format(item.item_promotion_price) }}
+                    {% else %}
+                        0.00
+                    {% endif %}
+                </td>
+                <td class="px-4 py-2 text-right text-gray-700">
+                    {{ item.purchase_limit if item.purchase_limit is not none else 'No Limit' }}
                 </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="4" class="px-4 py-3 text-center text-gray-400">No items found.</td>
+                <td colspan="7" class="px-4 py-3 text-center text-gray-400">No items found.</td>
             </tr>
             {% endfor %}
         </tbody>

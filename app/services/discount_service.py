@@ -2,7 +2,7 @@ import logging
 import math
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.database import async_session
 from app.models.discount import Discount, DiscountItem
-from app.models.product import TZ_GMT7
+from app.models.product import Product, ProductModel, TZ_GMT7
 from app.services import shopee_client
 from app.services.shopee_auth import get_valid_token
 
@@ -56,6 +56,54 @@ async def get_discount_detail(session: AsyncSession, discount_id: int) -> Discou
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def get_enriched_discount_items(session: AsyncSession, local_discount_id: int) -> list[dict]:
+    stmt = (
+        select(DiscountItem, Product, ProductModel)
+        .outerjoin(Product, Product.item_id == DiscountItem.shopee_item_id)
+        .outerjoin(
+            ProductModel,
+            and_(
+                ProductModel.model_id == DiscountItem.shopee_model_id,
+                DiscountItem.shopee_model_id != 0,
+            ),
+        )
+        .where(DiscountItem.discount_id == local_discount_id)
+        .order_by(DiscountItem.shopee_item_id, DiscountItem.shopee_model_id)
+    )
+    result = await session.execute(stmt)
+    rows = result.all()
+
+    items = []
+    for di, product, model in rows:
+        promo = float(di.item_promotion_price) if di.item_promotion_price is not None else None
+        if model and model.original_price is not None:
+            original_price = float(model.original_price)
+        elif product and product.original_price is not None:
+            original_price = float(product.original_price)
+        else:
+            original_price = None
+
+        if promo is not None and original_price and original_price > 0:
+            discount_pct = round((1 - promo / original_price) * 100)
+        else:
+            discount_pct = None
+
+        items.append({
+            "discount_item_id": di.id,
+            "shopee_item_id": di.shopee_item_id,
+            "shopee_model_id": di.shopee_model_id,
+            "item_promotion_price": promo,
+            "purchase_limit": di.purchase_limit,
+            "product_name": product.item_name if product else f"Item {di.shopee_item_id}",
+            "product_image": product.images[0] if (product and product.images) else None,
+            "model_name": model.model_name if model else None,
+            "model_sku": (model.model_sku if model else None) or (product.item_sku if product else None),
+            "original_price": original_price,
+            "discount_pct": discount_pct,
+        })
+    return items
 
 
 async def get_discount_sync_stats(session: AsyncSession) -> dict:
