@@ -132,14 +132,14 @@ async def get_enriched_discount_items(
         raw_promo = di.item_promotion_price
         raw_limit = di.purchase_limit
 
-        # For item-level rows the override key is (item_id, 0);
-        # for model-level rows it is (item_id, model_id).
-        if price_overrides is not None:
+        # Only apply the pre-branch override for model-level DB rows.
+        # Item-level rows (shopee_model_id==0) need per-model lookup inside the expansion loop.
+        if price_overrides is not None and di.shopee_model_id != 0:
             override_key = (di.shopee_item_id, di.shopee_model_id)
             if override_key in price_overrides:
                 ov = price_overrides[override_key]
-                raw_promo = ov["price"]      # already float|None
-                raw_limit = ov["limit"]      # already int|None
+                raw_promo = ov["price"]
+                raw_limit = ov["limit"]
 
         if di.shopee_model_id != 0:
             # Model-level row — existing logic, unchanged
@@ -171,8 +171,17 @@ async def get_enriched_discount_items(
             # Item-level row — expand into one row per ProductModel
             pm_list = models_by_item.get(di.shopee_item_id, [])
             if pm_list:
-                promo = float(raw_promo) if raw_promo else None
                 for pm in pm_list:
+                    # Per-model override: try (item_id, model_id) then (item_id, 0)
+                    model_promo = raw_promo
+                    model_limit = raw_limit
+                    if price_overrides is not None:
+                        ov = (price_overrides.get((di.shopee_item_id, pm.model_id))
+                              or price_overrides.get((di.shopee_item_id, 0)))
+                        if ov:
+                            model_promo = ov["price"]
+                            model_limit = ov["limit"]
+                    promo = float(model_promo) if model_promo else None
                     original_price = float(pm.original_price) if pm.original_price else None
                     discount_pct = (
                         round((1 - promo / original_price) * 100)
@@ -185,7 +194,7 @@ async def get_enriched_discount_items(
                         "shopee_item_id": di.shopee_item_id,
                         "shopee_model_id": pm.model_id,
                         "item_promotion_price": promo,
-                        "purchase_limit": raw_limit or None,
+                        "purchase_limit": model_limit or None,
                         "product_name": product_name,
                         "product_image": product_image,
                         "model_name": pm.model_name,
