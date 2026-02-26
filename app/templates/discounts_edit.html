@@ -90,8 +90,8 @@
                     <tbody>
                         {% for i in items %}
                         {# hidden fields for item/model identity #}
-                        <input type="hidden" name="item_id_{{ i.discount_item_id }}" value="{{ i.shopee_item_id }}">
-                        <input type="hidden" name="model_id_{{ i.discount_item_id }}" value="{{ i.shopee_model_id }}">
+                        <input type="hidden" name="item_id_{{ i.form_key }}" value="{{ i.shopee_item_id }}">
+                        <input type="hidden" name="model_id_{{ i.form_key }}" value="{{ i.shopee_model_id }}">
 
                         <tr class="border-b last:border-0 hover:bg-gray-50"
                             data-orig="{{ i.original_price if i.original_price is not none else '' }}">
@@ -139,28 +139,28 @@
                             <!-- Discount % -->
                             <td class="px-4 py-3 text-right">
                                 <input type="number"
-                                       name="pct_{{ i.discount_item_id }}"
+                                       name="pct_{{ i.form_key }}"
                                        value="{{ i.discount_pct if i.discount_pct is not none else '' }}"
                                        min="0" max="99" step="1"
                                        class="pct-input w-20 border border-gray-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-400"
-                                       data-di-id="{{ i.discount_item_id }}"
+                                       data-form-key="{{ i.form_key }}"
                                        placeholder="%">
                             </td>
                             <!-- Discounted Price -->
                             <td class="px-4 py-3 text-right">
                                 <input type="number"
-                                       name="price_{{ i.discount_item_id }}"
-                                       value="{{ i.item_promotion_price if i.item_promotion_price is not none else '' }}"
+                                       name="price_{{ i.form_key }}"
+                                       value="{{ i.item_promotion_price or '' }}"
                                        min="0" step="1"
                                        class="price-input w-32 border border-gray-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-400"
-                                       data-di-id="{{ i.discount_item_id }}"
+                                       data-form-key="{{ i.form_key }}"
                                        placeholder="Price">
                             </td>
                             <!-- Purchase Limit -->
                             <td class="px-4 py-3 text-right">
                                 <input type="number"
-                                       name="limit_{{ i.discount_item_id }}"
-                                       value="{{ i.purchase_limit if i.purchase_limit is not none else '' }}"
+                                       name="limit_{{ i.form_key }}"
+                                       value="{{ i.purchase_limit or '' }}"
                                        min="0" step="1"
                                        class="w-24 border border-gray-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-400"
                                        placeholder="No limit">
@@ -193,9 +193,8 @@
 
 <script>
 (function () {
-    function getOriginalPrice(diId) {
-        // The tr row has data-orig; find it via any input with data-di-id
-        var pctInput = document.querySelector('.pct-input[data-di-id="' + diId + '"]');
+    function getOriginalPrice(fk) {
+        var pctInput = document.querySelector('.pct-input[data-form-key="' + fk + '"]');
         if (!pctInput) return null;
         var row = pctInput.closest('tr');
         if (!row) return null;
@@ -205,26 +204,26 @@
 
     document.querySelectorAll('.pct-input').forEach(function (pctEl) {
         pctEl.addEventListener('input', function () {
-            var diId = this.getAttribute('data-di-id');
-            var orig = getOriginalPrice(diId);
+            var fk = this.getAttribute('data-form-key');
+            var orig = getOriginalPrice(fk);
             if (orig === null) return;
             var pct = parseFloat(this.value);
             if (isNaN(pct)) return;
             var price = Math.round(orig * (1 - pct / 100));
-            var priceEl = document.querySelector('.price-input[data-di-id="' + diId + '"]');
+            var priceEl = document.querySelector('.price-input[data-form-key="' + fk + '"]');
             if (priceEl) priceEl.value = price;
         });
     });
 
     document.querySelectorAll('.price-input').forEach(function (priceEl) {
         priceEl.addEventListener('input', function () {
-            var diId = this.getAttribute('data-di-id');
-            var orig = getOriginalPrice(diId);
+            var fk = this.getAttribute('data-form-key');
+            var orig = getOriginalPrice(fk);
             if (orig === null || orig === 0) return;
             var price = parseFloat(this.value);
             if (isNaN(price)) return;
             var pct = Math.round((1 - price / orig) * 100);
-            var pctEl = document.querySelector('.pct-input[data-di-id="' + diId + '"]');
+            var pctEl = document.querySelector('.pct-input[data-form-key="' + fk + '"]');
             if (pctEl) pctEl.value = pct;
         });
     });

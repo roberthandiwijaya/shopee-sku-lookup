@@ -261,22 +261,18 @@ async def discount_edit_submit(
         end_time=end_time_ts,
     )
 
-    # Build item_list from form fields
-    enriched = await discount_service.get_enriched_discount_items(session, discount.id)
+    # Scan the form for all item_id_* keys to build item_list dynamically
+    form_keys = [k[len("item_id_"):] for k in form.keys() if k.startswith("item_id_")]
     item_list = []
-    for item in enriched:
-        di_id = item["discount_item_id"]
-        price_key = f"price_{di_id}"
-        limit_key = f"limit_{di_id}"
-        price_val = form.get(price_key)
-        limit_val = form.get(limit_key)
-        if price_val is not None:
-            entry = {
-                "item_id": item["shopee_item_id"],
-                "item_promotion_price": float(price_val),
-            }
-            if item["shopee_model_id"] != 0:
-                entry["model_id"] = item["shopee_model_id"]
+    for fk in form_keys:
+        item_id = int(form[f"item_id_{fk}"])
+        model_id = int(form[f"model_id_{fk}"])
+        price_val = form.get(f"price_{fk}", "").strip()
+        limit_val = form.get(f"limit_{fk}", "").strip()
+        if price_val:
+            entry = {"item_id": item_id, "item_promotion_price": float(price_val)}
+            if model_id != 0:
+                entry["model_id"] = model_id
             if limit_val:
                 entry["purchase_limit"] = int(limit_val)
             item_list.append(entry)

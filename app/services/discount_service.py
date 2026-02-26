@@ -75,34 +75,102 @@ async def get_enriched_discount_items(session: AsyncSession, local_discount_id: 
     result = await session.execute(stmt)
     rows = result.all()
 
+    # Batch-load ProductModels for all item-level rows (model_id == 0)
+    item_ids_to_expand = [di.shopee_item_id for di, _, _ in rows if di.shopee_model_id == 0]
+    models_by_item: dict[int, list[ProductModel]] = {}
+    if item_ids_to_expand:
+        res = await session.execute(
+            select(ProductModel)
+            .where(ProductModel.item_id.in_(item_ids_to_expand))
+            .order_by(ProductModel.item_id, ProductModel.model_name)
+        )
+        for pm in res.scalars():
+            models_by_item.setdefault(pm.item_id, []).append(pm)
+
     items = []
     for di, product, model in rows:
-        promo = float(di.item_promotion_price) if di.item_promotion_price is not None else None
-        if model and model.original_price is not None:
-            original_price = float(model.original_price)
-        elif product and product.original_price is not None:
-            original_price = float(product.original_price)
-        else:
-            original_price = None
+        product_name = product.item_name if product else f"Item {di.shopee_item_id}"
+        product_image = product.images[0] if (product and product.images) else None
+        raw_promo = di.item_promotion_price
+        raw_limit = di.purchase_limit
 
-        if promo is not None and original_price and original_price > 0:
-            discount_pct = round((1 - promo / original_price) * 100)
+        if di.shopee_model_id != 0:
+            # Model-level row — existing logic, unchanged
+            promo = float(raw_promo) if raw_promo else None
+            original_price = (
+                float(model.original_price) if (model and model.original_price is not None)
+                else (float(product.original_price) if (product and product.original_price is not None) else None)
+            )
+            discount_pct = (
+                round((1 - promo / original_price) * 100)
+                if (promo and original_price and original_price > 0) else None
+            )
+            form_key = f"{di.shopee_item_id}_{di.shopee_model_id}"
+            items.append({
+                "form_key": form_key,
+                "discount_item_id": di.id,
+                "shopee_item_id": di.shopee_item_id,
+                "shopee_model_id": di.shopee_model_id,
+                "item_promotion_price": promo,
+                "purchase_limit": raw_limit or None,
+                "product_name": product_name,
+                "product_image": product_image,
+                "model_name": model.model_name if model else None,
+                "model_sku": (model.model_sku if model else None) or (product.item_sku if product else None),
+                "original_price": original_price,
+                "discount_pct": discount_pct,
+            })
         else:
-            discount_pct = None
-
-        items.append({
-            "discount_item_id": di.id,
-            "shopee_item_id": di.shopee_item_id,
-            "shopee_model_id": di.shopee_model_id,
-            "item_promotion_price": promo,
-            "purchase_limit": di.purchase_limit,
-            "product_name": product.item_name if product else f"Item {di.shopee_item_id}",
-            "product_image": product.images[0] if (product and product.images) else None,
-            "model_name": model.model_name if model else None,
-            "model_sku": (model.model_sku if model else None) or (product.item_sku if product else None),
-            "original_price": original_price,
-            "discount_pct": discount_pct,
-        })
+            # Item-level row — expand into one row per ProductModel
+            pm_list = models_by_item.get(di.shopee_item_id, [])
+            if pm_list:
+                promo = float(raw_promo) if raw_promo else None
+                for pm in pm_list:
+                    original_price = float(pm.original_price) if pm.original_price else None
+                    discount_pct = (
+                        round((1 - promo / original_price) * 100)
+                        if (promo and original_price and original_price > 0) else None
+                    )
+                    form_key = f"{di.shopee_item_id}_{pm.model_id}"
+                    items.append({
+                        "form_key": form_key,
+                        "discount_item_id": di.id,
+                        "shopee_item_id": di.shopee_item_id,
+                        "shopee_model_id": pm.model_id,
+                        "item_promotion_price": promo,
+                        "purchase_limit": raw_limit or None,
+                        "product_name": product_name,
+                        "product_image": product_image,
+                        "model_name": pm.model_name,
+                        "model_sku": pm.model_sku or (product.item_sku if product else None),
+                        "original_price": original_price,
+                        "discount_pct": discount_pct,
+                    })
+            else:
+                # No models found — fall back to item-level row
+                promo = float(raw_promo) if raw_promo else None
+                original_price = (
+                    float(product.original_price) if (product and product.original_price is not None) else None
+                )
+                discount_pct = (
+                    round((1 - promo / original_price) * 100)
+                    if (promo and original_price and original_price > 0) else None
+                )
+                form_key = f"{di.shopee_item_id}_0"
+                items.append({
+                    "form_key": form_key,
+                    "discount_item_id": di.id,
+                    "shopee_item_id": di.shopee_item_id,
+                    "shopee_model_id": 0,
+                    "item_promotion_price": promo,
+                    "purchase_limit": raw_limit or None,
+                    "product_name": product_name,
+                    "product_image": product_image,
+                    "model_name": None,
+                    "model_sku": product.item_sku if product else None,
+                    "original_price": original_price,
+                    "discount_pct": discount_pct,
+                })
     return items
 
 
