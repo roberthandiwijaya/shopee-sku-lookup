@@ -58,7 +58,45 @@ async def get_discount_detail(session: AsyncSession, discount_id: int) -> Discou
     return result.scalar_one_or_none()
 
 
-async def get_enriched_discount_items(session: AsyncSession, local_discount_id: int) -> list[dict]:
+async def fetch_live_discount_prices(
+    shop_id: int, access_token: str, shopee_discount_id: int
+) -> dict[tuple[int, int], dict]:
+    """Return {(item_id, model_id): {"price": float|None, "limit": int|None}} from Shopee API."""
+    overrides: dict[tuple[int, int], dict] = {}
+    item_offset = 0
+    item_limit = 100
+    while True:
+        detail = await shopee_client.shop_request(
+            "/api/v2/discount/get_discount",
+            access_token=access_token,
+            shop_id=shop_id,
+            params={
+                "discount_id": shopee_discount_id,
+                "item_offset": item_offset,
+                "item_limit": item_limit,
+            },
+        )
+        item_list = detail.get("response", {}).get("item_list", [])
+        for item in item_list:
+            item_id = item.get("item_id")
+            model_id = item.get("model_id", 0) or 0
+            price = item.get("item_promotion_price")
+            limit = item.get("purchase_limit")
+            overrides[(item_id, model_id)] = {
+                "price": float(price) if price else None,
+                "limit": limit or None,
+            }
+        if len(item_list) < item_limit:
+            break
+        item_offset += item_limit
+    return overrides
+
+
+async def get_enriched_discount_items(
+    session: AsyncSession,
+    local_discount_id: int,
+    price_overrides: dict[tuple[int, int], dict] | None = None,
+) -> list[dict]:
     stmt = (
         select(DiscountItem, Product, ProductModel)
         .outerjoin(Product, Product.item_id == DiscountItem.shopee_item_id)
@@ -93,6 +131,15 @@ async def get_enriched_discount_items(session: AsyncSession, local_discount_id: 
         product_image = product.images[0] if (product and product.images) else None
         raw_promo = di.item_promotion_price
         raw_limit = di.purchase_limit
+
+        # For item-level rows the override key is (item_id, 0);
+        # for model-level rows it is (item_id, model_id).
+        if price_overrides is not None:
+            override_key = (di.shopee_item_id, di.shopee_model_id)
+            if override_key in price_overrides:
+                ov = price_overrides[override_key]
+                raw_promo = ov["price"]      # already float|None
+                raw_limit = ov["limit"]      # already int|None
 
         if di.shopee_model_id != 0:
             # Model-level row — existing logic, unchanged

@@ -221,7 +221,17 @@ async def discount_edit_page(
     discount = await discount_service.get_discount_detail(session, discount_id)
     if not discount:
         return HTMLResponse("Discount not found", status_code=404)
-    items = await discount_service.get_enriched_discount_items(session, discount.id)
+
+    price_overrides = None
+    if discount.discount_status == "ongoing":
+        access_token = await get_valid_token(settings.shopee_shop_id)
+        price_overrides = await discount_service.fetch_live_discount_prices(
+            settings.shopee_shop_id, access_token, discount.discount_id
+        )
+
+    items = await discount_service.get_enriched_discount_items(
+        session, discount.id, price_overrides=price_overrides
+    )
     return templates.TemplateResponse(request, "discounts_edit.html", {
         "discount": discount,
         "items": items,
