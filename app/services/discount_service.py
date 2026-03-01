@@ -180,6 +180,7 @@ async def get_enriched_discount_items(
                 "model_sku": (model.model_sku if model else None) or (product.item_sku if product else None),
                 "original_price": original_price,
                 "discount_pct": discount_pct,
+                "stock": model.stock if model else None,
             })
         else:
             # Item-level row — expand into one row per ProductModel
@@ -215,6 +216,7 @@ async def get_enriched_discount_items(
                         "model_sku": pm.model_sku or (product.item_sku if product else None),
                         "original_price": original_price,
                         "discount_pct": discount_pct,
+                        "stock": pm.stock,
                     })
             else:
                 # No models found — fall back to item-level row
@@ -240,6 +242,7 @@ async def get_enriched_discount_items(
                     "model_sku": product.item_sku if product else None,
                     "original_price": original_price,
                     "discount_pct": discount_pct,
+                    "stock": product.stock if product else None,
                 })
     return items
 

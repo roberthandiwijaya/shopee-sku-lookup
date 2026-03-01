@@ -82,6 +82,7 @@
                             <th class="px-4 py-3 text-left">Variation</th>
                             <th class="px-4 py-3 text-left">SKU</th>
                             <th class="px-4 py-3 text-right">Original Price</th>
+                            <th class="px-4 py-3 text-right w-24">Stock</th>
                             <th class="px-4 py-3 text-right w-28">Discount %</th>
                             <th class="px-4 py-3 text-right w-36">Discounted Price</th>
                             <th class="px-4 py-3 text-right w-28">Purchase Limit</th>
@@ -132,6 +133,14 @@
                             <td class="px-4 py-3 text-right text-gray-700 text-xs">
                                 {% if i.original_price is not none %}
                                     {{ "{:,.0f}".format(i.original_price) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <!-- Stock -->
+                            <td class="px-4 py-3 text-right text-gray-700 text-xs">
+                                {% if i.stock is not none %}
+                                    {{ i.stock }}
                                 {% else %}
                                     -
                                 {% endif %}
