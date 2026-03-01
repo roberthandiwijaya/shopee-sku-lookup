@@ -224,10 +224,15 @@ async def discount_edit_page(
 
     price_overrides = None
     if discount.discount_status == "ongoing":
-        access_token = await get_valid_token(settings.shopee_shop_id)
-        price_overrides = await discount_service.fetch_live_discount_prices(
-            settings.shopee_shop_id, access_token, discount.discount_id
-        )
+        try:
+            access_token = await get_valid_token(settings.shopee_shop_id)
+            if access_token:
+                price_overrides = await discount_service.fetch_live_discount_prices(
+                    settings.shopee_shop_id, access_token, discount.discount_id
+                )
+        except Exception:
+            # If API fails, use database values (price_overrides stays None)
+            pass
 
     items = await discount_service.get_enriched_discount_items(
         session, discount.id, price_overrides=price_overrides

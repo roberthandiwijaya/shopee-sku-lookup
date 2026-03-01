@@ -79,13 +79,27 @@ async def fetch_live_discount_prices(
         item_list = detail.get("response", {}).get("item_list", [])
         for item in item_list:
             item_id = item.get("item_id")
-            model_id = item.get("model_id", 0) or 0
-            price = item.get("item_promotion_price")
             limit = item.get("purchase_limit")
-            overrides[(item_id, model_id)] = {
-                "price": float(price) if price else None,
-                "limit": limit or None,
-            }
+            
+            # Check if item has models
+            model_list = item.get("model_list", [])
+            if model_list:
+                # Item has models - extract price per model
+                for model in model_list:
+                    model_id = model.get("model_id", 0)
+                    price = model.get("model_promotion_price")
+                    overrides[(item_id, model_id)] = {
+                        "price": float(price) if price else None,
+                        "limit": limit or None,
+                    }
+            else:
+                # Item without models - use item-level price
+                model_id = item.get("model_id", 0) or 0
+                price = item.get("item_promotion_price")
+                overrides[(item_id, model_id)] = {
+                    "price": float(price) if price else None,
+                    "limit": limit or None,
+                }
         if len(item_list) < item_limit:
             break
         item_offset += item_limit
