@@ -2,6 +2,13 @@
 
 REST API + web dashboard that syncs products from Shopee Open API v2.0 to a local PostgreSQL database and serves fast SKU-based lookups.
 
+## 🆕 What's New
+
+- **🔥 Discount Management** — Edit ongoing discounts with live price pre-fill from Shopee API
+- **📊 Stock Tracking** — View current inventory levels in discount edit page
+- **🧪 Sandbox + Production** — Dual environment setup for safe development
+- **🚀 Easy Deploy Script** — One-command deployment to sandbox or production
+
 ## Tech Stack
 
 - **Python 3.11+** / **FastAPI**
@@ -10,9 +17,9 @@ REST API + web dashboard that syncs products from Shopee Open API v2.0 to a loca
 - **APScheduler** for periodic product sync
 - **Jinja2** + **htmx** + **Tailwind CSS** for the web dashboard (zero build tools)
 
-## Quick Start (Docker)
+## 🚀 Quick Start (Docker)
 
-The easiest way to run everything — PostgreSQL, pgAdmin, and the FastAPI app — with a single command:
+The easiest way to run everything — PostgreSQL and the FastAPI app — with a single command:
 
 ### 1. Configure environment
 
@@ -35,13 +42,12 @@ SHOPEE_SHOP_ID=your_shop_id
 docker compose up --build
 ```
 
-This starts all three services:
+This starts the services:
 
 | Service | URL |
 |---------|-----|
 | **FastAPI app** | http://localhost:8000 |
-| **pgAdmin** | http://localhost:5050 |
-| **PostgreSQL** | `localhost:54558` |
+| **PostgreSQL** | `localhost:5432` (internal) |
 
 Database migrations are applied automatically on startup.
 
@@ -59,16 +65,17 @@ After login you can:
 - Monitor sync status and token health at a glance
 - Browse and search products by SKU
 - Expand products to view variants
+- **Manage discounts** — View, edit, and delete Shopee discounts
 - Trigger manual syncs
 - Re-authorize your Shopee token
 
 ### 4. Authorize with Shopee
 
-Click "Re-authorize" in the dashboard's auth panel, or open `http://localhost:8000/api/auth/login` — this returns a Shopee OAuth URL. Open it in your browser, authorize, and the callback will store your tokens.
+Click **"Re-authorize"** in the dashboard's auth panel, or open `http://localhost:8000/api/auth/login` — this returns a Shopee OAuth URL. Open it in your browser, authorize, and the callback will store your tokens.
 
 ### 5. Sync products
 
-Click "Sync Now" in the dashboard, or via API:
+Click **"Sync Now"** in the dashboard, or via API:
 
 ```bash
 curl -X POST -H "X-API-Key: your_api_key" http://localhost:8000/api/sync
@@ -89,43 +96,52 @@ curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1&s
 curl -H "X-API-Key: your_api_key" "http://localhost:8000/api/products?sku=SKU1,SKU2,SKU3"
 ```
 
-## Production Deployment
+## 🏭 Production Deployment with Sandbox
 
-See **[DEPLOYMENT.md](DEPLOYMENT.md)** for a step-by-step guide to deploy on an Ubuntu or OpenCloudOS VPS.
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for a complete guide to deploy **both Sandbox and Production** environments on a VPS.
 
-## Local Development (without Docker)
-
-If you prefer running the app outside of Docker:
+### Quick Deploy
 
 ```bash
-# Start only PostgreSQL and pgAdmin
-docker compose up -d postgres pgadmin
+# Deploy to sandbox (port 8001)
+./deploy.sh sandbox
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Run migrations
-alembic upgrade head
-
-# Start the server with hot reload
-uvicorn app.main:app --reload --port 8000
+# Deploy to production (port 8000)
+./deploy.sh production
 ```
 
-The `.env` file points to `localhost:54558` by default, which matches the PostgreSQL container's exposed port.
+## 💰 Discount Management
 
-## Dashboard
+The dashboard includes a powerful **Discount Management** feature:
 
-The web dashboard at `/` provides three panels:
+### Features
+- **View all discounts** — Active, upcoming, and expired
+- **Edit ongoing discounts** — Modify prices, end dates, purchase limits
+- **Live price pre-fill** — Automatically fetches current promotion prices from Shopee API
+- **Stock display** — See current inventory levels while editing
+- **Per-model editing** — Edit individual product variants separately
+
+### How to Use
+1. Go to **Discounts** page
+2. Click on any discount
+3. Click **"Edit"** button
+4. Modify prices, end date, or purchase limits
+5. Click **"Save Changes"**
+
+## 📊 Dashboard Features
+
+The web dashboard provides several panels:
 
 | Panel | Features |
 |-------|----------|
 | **Sync Status** | Product/variant counts, last sync time, token health indicator, "Sync Now" button. Auto-refreshes every 30s. |
 | **Authentication** | Token status badge, expiry countdown, shop ID, "Re-authorize" button. Auto-refreshes every 30s. |
 | **Products** | Searchable product table with SKU filtering (300ms debounce), pagination, and expandable variant rows. |
+| **Discounts** | List all discounts with status, date range, item count. Edit ongoing discounts with live price sync. |
 
 All interactions use htmx for seamless partial updates without full page reloads.
 
-## API Endpoints
+## 🌐 API Endpoints
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
@@ -135,6 +151,10 @@ All interactions use htmx for seamless partial updates without full page reloads
 | GET | `/logout` | — | Logout (clears session) |
 | GET | `/change-password` | Session | Change password page |
 | POST | `/change-password` | Session | Change password submit |
+| GET | `/discounts` | Session | Discounts list page |
+| GET | `/discounts/{id}/edit` | Session | Edit discount page |
+| POST | `/discounts/{id}/edit` | Session | Submit discount edits |
+| POST | `/discounts/{id}/delete` | Session | Delete discount |
 | GET | `/api/products?sku=...` | `X-API-Key` | SKU lookup (single, multiple, or comma-separated) |
 | POST | `/api/sync` | `X-API-Key` | Trigger manual product sync |
 | GET | `/api/sync/status` | — | Check last sync time and counts |
@@ -142,7 +162,7 @@ All interactions use htmx for seamless partial updates without full page reloads
 | GET | `/api/auth/callback` | — | OAuth callback (automatic) |
 | GET | `/docs` | — | Swagger UI |
 
-## Example Response
+## 📦 Example Response
 
 ```json
 {
@@ -166,16 +186,7 @@ All interactions use htmx for seamless partial updates without full page reloads
 }
 ```
 
-## pgAdmin Access
-
-After `docker compose up -d`, open http://localhost:5050 and login:
-
-- **Email:** `admin@admin.com`
-- **Password:** `admin`
-
-Add a server with host `postgres`, port `5432`, user/password `postgres`.
-
-## Running Tests
+## 🧪 Running Tests
 
 ```bash
 pytest tests/ -v
@@ -183,16 +194,38 @@ pytest tests/ -v
 
 Tests use SQLite (no PostgreSQL required).
 
-## Environment Variables
+## ⚙️ Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `API_KEY` | API key for protected endpoints (sent via `X-API-Key` header) | — |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://postgres:postgres@localhost:54558/shopee_products` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://postgres:postgres@localhost:5432/shopee_products` |
 | `SHOPEE_PARTNER_ID` | Shopee partner ID | — |
 | `SHOPEE_PARTNER_KEY` | Shopee partner key | — |
 | `SHOPEE_SHOP_ID` | Shopee shop ID | — |
-| `SHOPEE_BASE_URL` | Shopee API base URL | `https://openplatform.sandbox.test-stable.shopee.sg` |
+| `SHOPEE_BASE_URL` | Shopee API base URL | `https://partner.shopeemobile.com` |
 | `SHOPEE_REDIRECT_URL` | OAuth callback URL | `http://localhost:8000/api/auth/callback` |
 | `SESSION_SECRET_KEY` | Secret key for session cookies | `change-me-in-production` |
 | `SYNC_INTERVAL_MINUTES` | Auto-sync interval | `60` |
+
+## 🛠️ Local Development (without Docker)
+
+If you prefer running the app outside of Docker:
+
+```bash
+# Start only PostgreSQL
+docker compose up -d postgres
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run migrations
+alembic upgrade head
+
+# Start the server with hot reload
+uvicorn app.main:app --reload --port 8000
+```
+
+## 📝 License
+
+MIT © [Your Name]

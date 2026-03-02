@@ -1,6 +1,31 @@
 # Production Deployment Guide
 
-Deploy the Shopee SKU Lookup app on a VPS, accessible via IP address.
+Deploy the Shopee SKU Lookup app with **both Sandbox and Production environments** on a VPS.
+
+## 🏗️ Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        YOUR VPS                              │
+│                                                              │
+│   ┌─────────────────────┐    ┌─────────────────────┐        │
+│   │     SANDBOX         │    │    PRODUCTION       │        │
+│   │    Port 8001        │    │    Port 8000        │        │
+│   │                     │    │                     │        │
+│   │  • Test changes     │    │  • Live system      │        │
+│   │  • Sandbox API      │    │  • Real API         │        │
+│   │  • Safe to break    │    │  • Customer data    │        │
+│   └─────────────────────┘    └─────────────────────┘        │
+│                                                              │
+│   Separate PostgreSQL databases for each environment        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 📋 Prerequisites
+
+- VPS with a supported Linux distro (minimum 2 vCPU, 2 GB RAM)
+- SSH access as root or a sudo user
+- Domain or static IP (for Shopee OAuth callback)
 
 Supported distros:
 - [Ubuntu 22.04 / 24.04](#2a-server-setup-ubuntu)
@@ -8,18 +33,23 @@ Supported distros:
 
 ---
 
-## 1. Prerequisites
-
-- VPS with a supported Linux distro (minimum 1 vCPU, 1 GB RAM)
-- SSH access as root or a sudo user
-
-## 2a. Server Setup (Ubuntu)
+## 1. System Setup
 
 ### Update system packages
 
+**Ubuntu:**
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
+
+**OpenCloudOS / RHEL:**
+```bash
+sudo dnf update -y
+```
+
+---
+
+## 2a. Server Setup (Ubuntu)
 
 ### Install Docker + Docker Compose plugin
 
@@ -50,41 +80,27 @@ docker --version
 docker compose version
 ```
 
-### Allow your user to run Docker without sudo (optional)
-
-```bash
-sudo usermod -aG docker $USER
-# Log out and back in for this to take effect
-```
-
-### Open firewall port
+### Open firewall ports
 
 ```bash
 sudo ufw allow OpenSSH
-sudo ufw allow 8000
+sudo ufw allow 8000/tcp   # Production
+sudo ufw allow 8001/tcp   # Sandbox
 sudo ufw enable
 ```
 
-> **Next:** Skip to [Section 3 — Deploy the App](#3-deploy-the-app).
+---
 
 ## 2b. Server Setup (OpenCloudOS / RHEL-based)
-
-These instructions also work for CentOS Stream, Rocky Linux, AlmaLinux, and other RHEL-based distros.
-
-### Update system packages
-
-```bash
-sudo dnf update -y
-```
 
 ### Install Docker + Docker Compose plugin
 
 ```bash
-# Install yum-utils (provides yum-config-manager)
-sudo dnf install -y yum-utils
+# Install dnf-plugins-core
+sudo dnf install -y dnf-plugins-core
 
-# Add Docker's official repository (uses the CentOS repo, compatible with RHEL-based distros)
-sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+# Add Docker's official repository
+sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 
 # Install Docker
 sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
@@ -97,142 +113,124 @@ docker --version
 docker compose version
 ```
 
-### Allow your user to run Docker without sudo (optional)
+### Open firewall ports
 
 ```bash
-sudo usermod -aG docker $USER
-# Log out and back in for this to take effect
-```
-
-### Open firewall port
-
-```bash
-sudo firewall-cmd --permanent --add-port=8000/tcp
+sudo firewall-cmd --permanent --add-port=8000/tcp   # Production
+sudo firewall-cmd --permanent --add-port=8001/tcp   # Sandbox
 sudo firewall-cmd --permanent --add-service=ssh
 sudo firewall-cmd --reload
 ```
 
-## 3. Deploy the App
+---
 
-### Clone the repository
+## 3. Deploy Both Environments
+
+### Option A: Automated Setup (Recommended)
+
+The repository includes a setup script that creates both environments:
 
 ```bash
+# Clone the repository
 cd /opt
 sudo git clone https://github.com/roberthandiwijaya/shopee-sku-lookup.git shopee
 sudo chown -R $USER:$USER /opt/shopee
 cd /opt/shopee
+
+# Create sandbox directory structure
+sudo mkdir -p /opt/shopee-sandbox
+sudo chown -R $USER:$USER /opt/shopee-sandbox
 ```
 
-### Create `.env` from the example
+### Option B: Manual Setup
+
+#### 3.1 Production Environment
 
 ```bash
+cd /opt/shopee
+
+# Create production .env
 cp .env.example .env
 nano .env
 ```
 
-Fill in the following values:
-
+**Production `.env`:**
 ```dotenv
-# PostgreSQL — no change needed, the Docker internal URL is set in docker-compose.yml
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/shopee_products
+# PostgreSQL
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_products
 
-# Shopee API — switch to production URL
+# Shopee API - PRODUCTION
 SHOPEE_BASE_URL=https://partner.shopeemobile.com
+SHOPEE_PARTNER_ID=YOUR_PROD_PARTNER_ID
+SHOPEE_PARTNER_KEY=YOUR_PROD_PARTNER_KEY
+SHOPEE_SHOP_ID=YOUR_PROD_SHOP_ID
 
-# Shopee credentials — fill in your real values
-SHOPEE_PARTNER_ID=123456
-SHOPEE_PARTNER_KEY=your_real_partner_key
-SHOPEE_SHOP_ID=your_real_shop_id
+# API Key (generate: openssl rand -hex 32)
+API_KEY=your_secure_api_key_here
 
-# Redirect URL — replace <VPS_IP> with your server's public IP
-SHOPEE_REDIRECT_URL=http://<VPS_IP>:8000/api/auth/callback
+# Session Secret (generate: openssl rand -hex 32)
+SESSION_SECRET_KEY=your_secure_session_secret_here
 
-# API key — generate a secure random value
-# Run: openssl rand -hex 32
-API_KEY=<paste_generated_key>
-
-# Session secret — generate a secure random value
-# Run: openssl rand -hex 32
-SESSION_SECRET_KEY=<paste_generated_key>
+# Redirect URL
+SHOPEE_REDIRECT_URL=http://YOUR_VPS_IP:8000/api/auth/callback
 
 # Sync interval (minutes)
 SYNC_INTERVAL_MINUTES=60
 ```
 
-> **Tip:** Generate secure keys with:
-> ```bash
-> openssl rand -hex 32
-> ```
-
-## 4. Production Tweaks to `docker-compose.yml`
-
-Edit `docker-compose.yml` to make three changes:
+#### 3.2 Sandbox Environment
 
 ```bash
-nano docker-compose.yml
+cd /opt/shopee-sandbox
+
+# Clone/copy code from production
+git clone https://github.com/roberthandiwijaya/shopee-sku-lookup.git .
+
+# Create sandbox .env
+cp .env.example .env
+nano .env
 ```
 
-### a) Remove the pgAdmin service
+**Sandbox `.env`:**
+```dotenv
+# PostgreSQL
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_sandbox
 
-Delete the entire `pgadmin` block (saves memory on a small VPS):
+# Shopee API - SANDBOX
+SHOPEE_BASE_URL=https://openplatform.sandbox.test-stable.shopee.sg
+SHOPEE_PARTNER_ID=YOUR_SANDBOX_PARTNER_ID
+SHOPEE_PARTNER_KEY=YOUR_SANDBOX_PARTNER_KEY
+SHOPEE_SHOP_ID=YOUR_SANDBOX_SHOP_ID
 
-```yaml
-  # DELETE this entire block:
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
+# API Key (different from production)
+API_KEY=sandbox_api_key_here
+
+# Session Secret (different from production)
+SESSION_SECRET_KEY=sandbox_session_secret_here
+
+# Redirect URL
+SHOPEE_REDIRECT_URL=http://YOUR_VPS_IP:8001/api/auth/callback
+
+# Sync interval (minutes)
+SYNC_INTERVAL_MINUTES=60
 ```
 
-### b) Lock down the PostgreSQL port
+#### 3.3 Create Sandbox docker-compose.yml
 
-Change the `postgres` port mapping so it's only accessible from the host, not from the internet:
-
-```yaml
-    ports:
-      - "127.0.0.1:5432:5432"
-```
-
-Or remove the `ports` section entirely from the `postgres` service — the app container connects via the Docker network, so it doesn't need a host port.
-
-### c) Add restart policies
-
-Add `restart: unless-stopped` to both the `app` and `postgres` services so they come back after a reboot:
-
-```yaml
-  postgres:
-    image: postgres:16
-    container_name: shopee-pg
-    restart: unless-stopped
-    # ... rest of config
-
-  app:
-    build: .
-    container_name: shopee-app
-    restart: unless-stopped
-    # ... rest of config
-```
-
-### Final `docker-compose.yml` (for reference)
-
-```yaml
+```bash
+cd /opt/shopee-sandbox
+cat > docker-compose.yml << 'EOF'
 services:
   postgres:
     image: postgres:16
-    container_name: shopee-pg
+    container_name: shopee-sandbox-pg
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: shopee_products
+      POSTGRES_DB: shopee_sandbox
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - sandbox_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -241,77 +239,278 @@ services:
 
   app:
     build: .
-    container_name: shopee-app
+    container_name: shopee-sandbox-app
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_products
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_sandbox
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
-  pgdata:
+  sandbox_pgdata:
+EOF
 ```
 
-## 5. Start the App
+---
+
+## 4. Deploy Script (Optional but Recommended)
+
+Create a `deploy.sh` script for easy deployment:
 
 ```bash
+cat > /opt/shopee/deploy.sh << 'SCRIPT'
+#!/bin/bash
+# Deploy script for Shopee SKU Lookup
+# Usage: ./deploy.sh [sandbox|production] [commit-hash]
+
+set -e
+
+ENVIRONMENT=$1
+COMMIT=${2:-HEAD}
+
+if [ -z "$ENVIRONMENT" ]; then
+    echo "Usage: ./deploy.sh [sandbox|production] [commit-hash]"
+    echo "Examples:"
+    echo "  ./deploy.sh sandbox           # Deploy HEAD to sandbox"
+    echo "  ./deploy.sh production        # Deploy HEAD to production"
+    echo "  ./deploy.sh sandbox abc123    # Deploy specific commit"
+    exit 1
+fi
+
+if [ "$ENVIRONMENT" == "sandbox" ]; then
+    DIR="/opt/shopee-sandbox"
+    PORT="8001"
+    NAME="Sandbox"
+    DB_NAME="shopee_sandbox"
+    PG_CONTAINER="shopee-sandbox-pg"
+elif [ "$ENVIRONMENT" == "production" ]; then
+    DIR="/opt/shopee"
+    PORT="8000"
+    NAME="Production"
+    DB_NAME="shopee_products"
+    PG_CONTAINER="shopee-pg"
+else
+    echo "❌ Invalid environment. Use 'sandbox' or 'production'"
+    exit 1
+fi
+
+echo "🚀 Deploying to $NAME..."
+echo "📍 Directory: $DIR"
+echo "🌐 Port: $PORT"
+echo "📦 Commit: $COMMIT"
+echo ""
+
+cd "$DIR"
+
+# Backup database before deployment
+echo "💾 Creating database backup..."
+mkdir -p backups
+BACKUP_FILE="backups/backup_$(date +%Y%m%d_%H%M%S)_pre_deploy.sql"
+
+if docker ps | grep -q "$PG_CONTAINER"; then
+    docker exec "$PG_CONTAINER" pg_dump -U postgres "$DB_NAME" > "$BACKUP_FILE" 2>/dev/null && \
+        echo "✅ Backup saved: $BACKUP_FILE" || \
+        echo "⚠️  Backup skipped"
+else
+    echo "⚠️  Backup skipped (container not running)"
+fi
+
+echo ""
+
+# Pull latest code
+echo "📥 Fetching code..."
+git fetch origin
+git checkout "$COMMIT"
+
+# Rebuild and restart
+echo "🔨 Building and starting containers..."
+docker compose up -d --build
+
+# Wait for health check
+echo "⏳ Waiting for health check (10s)..."
+sleep 10
+
+# Verify deployment
+echo ""
+echo "🔍 Verifying deployment..."
+if curl -s "http://localhost:$PORT/api/sync/status" > /dev/null 2>&1; then
+    echo ""
+    echo "✅ $NAME deployment successful!"
+    echo "🌐 http://YOUR_VPS_IP:$PORT"
+else
+    echo ""
+    echo "❌ Deployment may have issues. Check logs: docker compose logs"
+    exit 1
+fi
+SCRIPT
+
+chmod +x /opt/shopee/deploy.sh
+cp /opt/shopee/deploy.sh /opt/shopee-sandbox/deploy.sh
+```
+
+---
+
+## 5. Start Both Environments
+
+```bash
+# Start production
 cd /opt/shopee
+docker compose up -d --build
+
+# Start sandbox
+cd /opt/shopee-sandbox
 docker compose up -d --build
 ```
 
-Verify everything is running:
-
+Verify both are running:
 ```bash
-docker compose ps
-docker compose logs app
+docker ps | grep shopee
 ```
 
-You should see the app listening on port 8000.
+You should see 4 containers:
+- `shopee-app` (port 8000)
+- `shopee-pg` 
+- `shopee-sandbox-app` (port 8001)
+- `shopee-sandbox-pg`
+
+---
 
 ## 6. Access
 
-- **Dashboard:** `http://<VPS_IP>:8000`
-- **Login:** username `admin`, password `admin` — **change the password immediately**
-- **API:**
-  ```bash
-  curl -H "X-API-Key: YOUR_API_KEY" http://<VPS_IP>:8000/api/products?sku=EXAMPLE
-  ```
+| Environment | URL | Purpose |
+|-------------|-----|---------|
+| **Production** | `http://<VPS_IP>:8000` | Live system |
+| **Sandbox** | `http://<VPS_IP>:8001` | Testing environment |
 
-## 7. Maintenance
+**Login:**
+- Username: `admin`
+- Password: `admin` (change immediately)
 
-### View logs
+---
 
-```bash
-docker compose logs -f app
+## 7. Development Workflow
+
+### Safe Development Process
+
+```
+1. DEVELOP & TEST in Sandbox
+   └─ Visit http://<VPS_IP>:8001
+   └─ Test all changes thoroughly
+
+2. DEPLOY to Production (when ready)
+   └─ cd /opt/shopee
+   └─ ./deploy.sh production
+   └─ Verify at http://<VPS_IP>:8000
+
+3. MONITOR both environments
+   └─ Check logs: docker compose logs -f
 ```
 
-### Restart the app
+### Using the Deploy Script
 
 ```bash
-docker compose restart app
-```
+# Deploy latest to sandbox
+cd /opt/shopee-sandbox
+./deploy.sh sandbox
 
-### Update to latest code
-
-```bash
+# Deploy specific commit to production
 cd /opt/shopee
-git pull
-docker compose up -d --build
+./deploy.sh production abc123def
+
+# Deploy latest to production
+./deploy.sh production
 ```
 
-### Backup the database
+---
+
+## 8. Maintenance
+
+### View Logs
 
 ```bash
-docker exec shopee-pg pg_dump -U postgres shopee_products > backup_$(date +%Y%m%d).sql
+# Production
+cd /opt/shopee && docker compose logs -f app
+
+# Sandbox
+cd /opt/shopee-sandbox && docker compose logs -f app
 ```
 
-### Restore from backup
+### Restart Services
 
 ```bash
-cat backup_20260219.sql | docker exec -i shopee-pg psql -U postgres shopee_products
+# Production
+cd /opt/shopee && docker compose restart app
+
+# Sandbox
+cd /opt/shopee-sandbox && docker compose restart app
 ```
+
+### Update to Latest Code
+
+```bash
+# Update both environments
+cd /opt/shopee && git pull && docker compose up -d --build
+cd /opt/shopee-sandbox && git pull && docker compose up -d --build
+```
+
+### Backup Databases
+
+```bash
+# Production backup
+docker exec shopee-pg pg_dump -U postgres shopee_products > backup_prod_$(date +%Y%m%d).sql
+
+# Sandbox backup
+docker exec shopee-sandbox-pg pg_dump -U postgres shopee_sandbox > backup_sandbox_$(date +%Y%m%d).sql
+```
+
+### Restore from Backup
+
+```bash
+# Production restore
+cat backup_prod_20260301.sql | docker exec -i shopee-pg psql -U postgres shopee_products
+
+# Sandbox restore
+cat backup_sandbox_20260301.sql | docker exec -i shopee-sandbox-pg psql -U postgres shopee_sandbox
+```
+
+---
+
+## 9. Troubleshooting
+
+### Container Won't Start
+
+```bash
+# Check logs
+docker compose logs app
+
+# Check for port conflicts
+netstat -tlnp | grep 8000
+netstat -tlnp | grep 8001
+```
+
+### Database Connection Issues
+
+```bash
+# Check PostgreSQL health
+docker compose ps
+docker compose logs postgres
+```
+
+### Permission Denied
+
+```bash
+# Fix ownership
+sudo chown -R $USER:$USER /opt/shopee
+sudo chown -R $USER:$USER /opt/shopee-sandbox
+```
+
+---
+
+## 🎉 You're Ready!
+
+Your dual-environment setup is complete. Use the **sandbox** for testing and **production** for live operations!
