@@ -76,6 +76,80 @@ def _get_primary_image_url(product: Product) -> str | None:
     return images[0] if images else None
 
 
+def _get_family_image_priority(product: Product) -> tuple[int, str]:
+    name = (product.item_name or "").upper()
+    if "SPREI" in name:
+        return (0, name)
+    if "BEDCOVER" in name:
+        return (1, name)
+    if _get_product_image_urls(product):
+        return (2, name)
+    return (3, name)
+
+
+def _select_family_image_source(products: list[Product]) -> Product | None:
+    if not products:
+        return None
+    ordered = sorted(products, key=_get_family_image_priority)
+    for product in ordered:
+        if _get_product_image_urls(product):
+            return product
+    return ordered[0]
+
+
+def _get_product_display_stock(product: Product) -> int | None:
+    if product.stock is not None:
+        return product.stock
+    if product.models:
+        stocks = [model.stock for model in product.models if model.stock is not None]
+        if stocks:
+            return sum(stocks)
+    return None
+
+
+def _build_family_card(family_code: str, products: list[Product]) -> dict:
+    ordered_products = sorted(products, key=lambda product: ((product.item_name or "").upper(), product.item_id))
+    image_source = _select_family_image_source(ordered_products)
+    image_urls = _get_product_image_urls(image_source) if image_source else []
+    prices = [float(product.current_price) for product in ordered_products if product.current_price is not None]
+
+    for product in ordered_products:
+        product.display_stock = _get_product_display_stock(product)
+
+    return {
+        "family_code": family_code,
+        "products": ordered_products,
+        "product_count": len(ordered_products),
+        "image_source": image_source,
+        "image_source_label": image_source.item_name if image_source else None,
+        "image_urls": image_urls,
+        "primary_image_url": image_urls[0] if image_urls else None,
+        "min_price": min(prices) if prices else None,
+        "max_price": max(prices) if prices else None,
+    }
+
+
+async def list_linked_product_families(session: AsyncSession) -> list[dict]:
+    result = await session.execute(
+        select(Product)
+        .options(selectinload(Product.models))
+        .where(Product.family_code.isnot(None), Product.family_code != "")
+        .order_by(Product.family_code, Product.item_name, Product.item_id)
+    )
+    products = result.scalars().all()
+
+    grouped: dict[str, list[Product]] = defaultdict(list)
+    for product in products:
+        grouped[product.family_code].append(product)
+
+    family_cards = [
+        _build_family_card(family_code, family_products)
+        for family_code, family_products in grouped.items()
+        if len(family_products) > 1
+    ]
+    return sorted(family_cards, key=lambda card: card["family_code"])
+
+
 def normalize_family_code(value: str | None) -> str | None:
     if value is None:
         return None
@@ -86,6 +160,13 @@ def normalize_family_code(value: str | None) -> str | None:
     if not match:
         raise ValueError("Family code must look like MP-8002")
     return match.group(1)
+
+
+def normalize_jenis_bahan(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = " ".join(value.strip().split())
+    return normalized or None
 
 
 async def list_products_paginated(
@@ -171,6 +252,18 @@ async def update_product_family_code(
     if product is None:
         return None
     product.family_code = normalize_family_code(family_code)
+    await session.commit()
+    await session.refresh(product)
+    return product
+
+
+async def update_product_jenis_bahan(
+    session: AsyncSession, item_id: int, jenis_bahan: str | None
+) -> Product | None:
+    product = await get_product_by_item_id(session, item_id)
+    if product is None:
+        return None
+    product.jenis_bahan = normalize_jenis_bahan(jenis_bahan)
     await session.commit()
     await session.refresh(product)
     return product

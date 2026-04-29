@@ -46,10 +46,15 @@
     </td>
     <td class="px-6 py-3 font-mono text-slate-600 dark:text-slate-300">
         <div>{{ product.item_sku or '-' }}</div>
-        <div class="mt-1 flex items-center gap-2">
+        <div class="mt-1 flex flex-wrap items-center gap-2">
             {% if product.family_code %}
             <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                 {{ product.family_code }}
+            </span>
+            {% endif %}
+            {% if product.jenis_bahan %}
+            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+                {{ product.jenis_bahan }}
             </span>
             {% endif %}
             <button type="button"
@@ -57,7 +62,14 @@
                     hx-target="#models-{{ product.item_id }}"
                     hx-swap="innerHTML"
                     class="text-[11px] font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200">
-                {% if product.family_code %}Edit{% else %}Set code{% endif %}
+                {% if product.family_code %}Edit code{% else %}Set code{% endif %}
+            </button>
+            <button type="button"
+                    hx-get="/partials/products/{{ product.item_id }}/jenis-bahan/edit?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+                    hx-target="#models-{{ product.item_id }}"
+                    hx-swap="innerHTML"
+                    class="text-[11px] font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200">
+                {% if product.jenis_bahan %}Edit bahan{% else %}Set bahan{% endif %}
             </button>
         </div>
     </td>

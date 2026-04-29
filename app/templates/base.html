@@ -203,6 +203,7 @@
         <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
                 <span class="text-xl font-bold text-white">Idola Style - Shopee SKU Dashboard</span>
+                <a href="/linked-products" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium {% if request.url.path.startswith('/linked-products') %}border-b-2 border-white dark:border-orange-300 pb-0.5{% endif %}">Linked Products</a>
                 {% if request.session.get("username") %}
                 <a href="/" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium {% if request.url.path == '/' %}border-b-2 border-white dark:border-orange-300 pb-0.5{% endif %}">Dashboard</a>
                 <a href="/discounts" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium {% if request.url.path.startswith('/discounts') %}border-b-2 border-white dark:border-orange-300 pb-0.5{% endif %}">Discounts</a>
