@@ -112,12 +112,14 @@ def _build_family_card(family_code: str, products: list[Product]) -> dict:
     image_source = _select_family_image_source(ordered_products)
     image_urls = _get_product_image_urls(image_source) if image_source else []
     prices = [float(product.current_price) for product in ordered_products if product.current_price is not None]
+    family_jenis_bahan = next((product.jenis_bahan for product in ordered_products if product.jenis_bahan), None)
 
     for product in ordered_products:
         product.display_stock = _get_product_display_stock(product)
 
     return {
         "family_code": family_code,
+        "jenis_bahan": family_jenis_bahan,
         "products": ordered_products,
         "product_count": len(ordered_products),
         "image_source": image_source,

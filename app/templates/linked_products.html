@@ -52,8 +52,18 @@
                 <div class="p-5">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Family Code</p>
-                            <h2 class="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">{{ family.family_code }}</h2>
+                            <div class="flex flex-wrap items-start gap-3">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Family Code</p>
+                                    <h2 class="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">{{ family.family_code }}</h2>
+                                </div>
+                                {% if family.jenis_bahan %}
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Jenis Bahan</p>
+                                    <div class="mt-1 inline-flex min-h-[2rem] items-center rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">{{ family.jenis_bahan }}</div>
+                                </div>
+                                {% endif %}
+                            </div>
                         </div>
                         <div class="flex flex-wrap gap-2 text-xs">
                             <span class="rounded-full bg-orange-100 px-3 py-1 font-medium text-orange-800 dark:bg-orange-500/10 dark:text-orange-200">{{ family.product_count }} products</span>
