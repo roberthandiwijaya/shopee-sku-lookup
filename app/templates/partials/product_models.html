@@ -27,17 +27,33 @@
 
     {% if product %}
     <div class="{% if models %}mt-4{% endif %}">
-        <div class="flex items-center justify-between px-4 pb-2">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {% if product.family_code %}Partner Products — {{ product.family_code }}{% else %}Partner Products{% endif %}
-            </h3>
-            <button type="button"
-                    hx-get="/partials/products/{{ product.item_id }}/family-code/edit?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
-                    hx-target="#models-{{ product.item_id }}"
-                    hx-swap="innerHTML"
-                    class="text-xs font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200">
-                {% if product.family_code %}Edit family code{% else %}Set family code{% endif %}
-            </button>
+        <div class="flex items-start justify-between gap-4 px-4 pb-2">
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {% if product.family_code %}Partner Products — {{ product.family_code }}{% else %}Partner Products{% endif %}
+                </h3>
+                <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    <span class="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        Jenis Bahan: {{ product.jenis_bahan or '-' }}
+                    </span>
+                </div>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+                <button type="button"
+                        hx-get="/partials/products/{{ product.item_id }}/family-code/edit?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+                        hx-target="#models-{{ product.item_id }}"
+                        hx-swap="innerHTML"
+                        class="text-xs font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200">
+                    {% if product.family_code %}Edit family code{% else %}Set family code{% endif %}
+                </button>
+                <button type="button"
+                        hx-get="/partials/products/{{ product.item_id }}/jenis-bahan/edit?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+                        hx-target="#models-{{ product.item_id }}"
+                        hx-swap="innerHTML"
+                        class="text-xs font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200">
+                    {% if product.jenis_bahan %}Edit jenis bahan{% else %}Set jenis bahan{% endif %}
+                </button>
+            </div>
         </div>
         <table class="w-full text-sm">
             <thead class="text-xs uppercase text-slate-500 dark:text-slate-400">

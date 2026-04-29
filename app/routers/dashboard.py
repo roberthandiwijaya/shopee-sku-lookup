@@ -400,6 +400,62 @@ async def partial_product_family_code_edit_submit(
     })
 
 
+@router.get("/partials/products/{item_id}/jenis-bahan/edit", response_class=HTMLResponse)
+async def partial_product_jenis_bahan_edit(
+    request: Request,
+    item_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Inline editor for a single product jenis bahan."""
+    product = await product_service.get_product_by_item_id(session, item_id)
+    if not product:
+        return HTMLResponse("Product not found", status_code=404)
+
+    return templates.TemplateResponse(request, "partials/product_jenis_bahan_form.html", {
+        "product": product,
+        "error": None,
+        "submitted_value": None,
+        "page": request.query_params.get("page", "1"),
+        "search": request.query_params.get("search", ""),
+        "partner_filter": request.query_params.get("partner_filter", ""),
+    })
+
+
+@router.post("/partials/products/{item_id}/jenis-bahan/edit", response_class=HTMLResponse)
+async def partial_product_jenis_bahan_edit_submit(
+    request: Request,
+    item_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Save an inline jenis bahan edit and return the updated detail panel."""
+    product = await product_service.get_product_by_item_id(session, item_id)
+    if not product:
+        return HTMLResponse("Product not found", status_code=404)
+
+    form = await request.form()
+    jenis_bahan = form.get("jenis_bahan")
+
+    try:
+        await product_service.update_product_jenis_bahan(session, item_id, jenis_bahan)
+    except ValueError as exc:
+        return templates.TemplateResponse(request, "partials/product_jenis_bahan_form.html", {
+            "product": product,
+            "error": str(exc),
+            "submitted_value": jenis_bahan,
+            "page": request.query_params.get("page", "1"),
+            "search": request.query_params.get("search", ""),
+            "partner_filter": request.query_params.get("partner_filter", ""),
+        }, status_code=400)
+
+    detail = await product_service.get_related_products(session, item_id)
+    return templates.TemplateResponse(request, "partials/product_models.html", {
+        "page": request.query_params.get("page", "1"),
+        "search": request.query_params.get("search", ""),
+        "partner_filter": request.query_params.get("partner_filter", ""),
+        **detail,
+    })
+
+
 @router.post("/partials/discount-sync-trigger", response_class=HTMLResponse)
 async def partial_discount_sync_trigger(request: Request):
     """Trigger a manual discount sync and return feedback fragment."""
