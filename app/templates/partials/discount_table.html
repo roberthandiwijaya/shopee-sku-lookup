@@ -1,9 +1,9 @@
-<div class="bg-white rounded-lg shadow">
-    <div class="p-6 border-b">
-        <div class="flex items-center justify-between mb-4">
+<div class="rounded-lg bg-white shadow transition-colors dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-slate-800">
+    <div class="border-b border-slate-200 p-6 dark:border-slate-800">
+        <div class="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-                <h2 class="text-lg font-semibold text-gray-800">Discounts</h2>
-                <div class="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100">Discounts</h2>
+                <div class="mt-1 flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
                     <span>{{ discount_stats.ongoing }} ongoing</span>
                     <span>{{ discount_stats.upcoming }} upcoming</span>
                     <span>
@@ -16,7 +16,7 @@
                     </span>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-3">
                 <button hx-post="/partials/discount-sync-trigger"
                         hx-target="#discount-sync-result"
                         hx-swap="innerHTML"
@@ -35,29 +35,29 @@
         </div>
 
         <!-- Status filter tabs -->
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
             <button hx-get="/partials/discounts"
                     hx-target="#discount-tbody"
                     hx-swap="innerHTML"
-                    class="px-3 py-1 text-sm rounded-full bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 transition-colors">
+                    class="rounded-full bg-orange-100 px-3 py-1 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:hover:bg-orange-500/25">
                 All
             </button>
             <button hx-get="/partials/discounts?status=ongoing"
                     hx-target="#discount-tbody"
                     hx-swap="innerHTML"
-                    class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                    class="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
                 Ongoing
             </button>
             <button hx-get="/partials/discounts?status=upcoming"
                     hx-target="#discount-tbody"
                     hx-swap="innerHTML"
-                    class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                    class="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
                 Upcoming
             </button>
             <button hx-get="/partials/discounts?status=expired"
                     hx-target="#discount-tbody"
                     hx-swap="innerHTML"
-                    class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                    class="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
                 Expired
             </button>
         </div>
@@ -65,7 +65,7 @@
 
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-600 dark:bg-slate-800/80 dark:text-slate-400">
                 <tr>
                     <th class="px-6 py-3 text-left w-8"></th>
                     <th class="px-6 py-3 text-left">Discount Name</th>

@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import settings
 from app.database import get_session
 from app.main import app
-from app.models.product import Base, Product, ProductModel
+from app.models.product import Base, DashboardUser, Product, ProductModel
+from app.services.dashboard_auth import hash_password
 
 TEST_API_KEY = "test-api-key-for-testing"
 settings.api_key = TEST_API_KEY
@@ -57,6 +58,7 @@ async def seed_products():
             item_status="NORMAL",
             currency="IDR",
             current_price=150000,
+            family_code="MP-8002",
             has_model=True,
             synced_at=now,
             created_at=now,
@@ -70,12 +72,40 @@ async def seed_products():
             item_status="NORMAL",
             currency="IDR",
             current_price=200000,
+            family_code="MP-8002",
             has_model=False,
             synced_at=now,
             created_at=now,
             updated_at=now,
         )
-        session.add_all([p1, p2])
+        p3 = Product(
+            shop_id=1,
+            item_id=1003,
+            item_sku="SOLO-SKU-3",
+            item_name="Solo Product ZZ-9001",
+            item_status="NORMAL",
+            currency="IDR",
+            current_price=175000,
+            family_code="ZZ-9001",
+            has_model=False,
+            synced_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        p4 = Product(
+            shop_id=1,
+            item_id=1004,
+            item_sku="PLAIN-SKU-4",
+            item_name="Plain Product",
+            item_status="NORMAL",
+            currency="IDR",
+            current_price=99000,
+            has_model=False,
+            synced_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add_all([p1, p2, p3, p4])
         await session.flush()
 
         m1 = ProductModel(
@@ -104,3 +134,27 @@ async def seed_products():
         )
         session.add_all([m1, m2])
         await session.commit()
+
+
+@pytest_asyncio.fixture
+async def dashboard_user():
+    now = datetime.now(TZ_GMT7)
+    password_hash, salt = hash_password("secret123")
+    async with TestSession() as session:
+        user = DashboardUser(
+            username="admin",
+            password_hash=password_hash,
+            salt=salt,
+            must_change_password=False,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(user)
+        await session.commit()
+
+
+@pytest_asyncio.fixture
+async def logged_in_client(client, dashboard_user):
+    resp = await client.post("/login", data={"username": "admin", "password": "secret123"}, follow_redirects=False)
+    assert resp.status_code == 303
+    yield client

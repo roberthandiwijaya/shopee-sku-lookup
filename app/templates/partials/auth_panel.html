@@ -1,9 +1,9 @@
-<div class="bg-white rounded-lg shadow p-6">
-    <h2 class="text-lg font-semibold text-gray-800 mb-4">Authentication</h2>
+<div class="rounded-lg bg-white p-6 shadow transition-colors dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-slate-800">
+    <h2 class="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-100">Authentication</h2>
 
     <div class="space-y-3">
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500">Status</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">Status</span>
             {% if token_details.status == "healthy" %}
                 <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Healthy</span>
             {% elif token_details.status == "expiring_soon" %}
@@ -11,44 +11,44 @@
             {% elif token_details.status == "expired" %}
                 <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Expired</span>
             {% else %}
-                <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Missing</span>
+                <span class="px-2 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">Missing</span>
             {% endif %}
         </div>
 
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500">Shop ID</span>
-            <span class="text-sm font-mono text-gray-700">{{ token_details.shop_id }}</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">Shop ID</span>
+            <span class="text-sm font-mono text-slate-700 dark:text-slate-200">{{ token_details.shop_id }}</span>
         </div>
 
         {% if shop_info and shop_info.shop_name %}
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500">Shop Name</span>
-            <span class="text-sm text-gray-700">{{ shop_info.shop_name }}</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">Shop Name</span>
+            <span class="text-sm text-slate-700 dark:text-slate-200">{{ shop_info.shop_name }}</span>
         </div>
         {% endif %}
 
         {% if shop_info and shop_info.auth_time %}
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500">Auth Time</span>
-            <span class="text-sm text-gray-700">{{ shop_info.auth_time | wib }}</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">Auth Time</span>
+            <span class="text-sm text-slate-700 dark:text-slate-200">{{ shop_info.auth_time | wib }}</span>
         </div>
         {% endif %}
 
         {% if shop_info and shop_info.expire_time %}
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500">Auth Expires</span>
-            <span class="text-sm text-gray-700">{{ shop_info.expire_time | wib }}</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">Auth Expires</span>
+            <span class="text-sm text-slate-700 dark:text-slate-200">{{ shop_info.expire_time | wib }}</span>
         </div>
         {% endif %}
 
         {% if token_details.expires_at %}
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500">Expires</span>
-            <span class="text-sm text-gray-700">{{ token_details.expires_at | wib }}</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">Expires</span>
+            <span class="text-sm text-slate-700 dark:text-slate-200">{{ token_details.expires_at | wib }}</span>
         </div>
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500">Time Left</span>
-            <span class="text-sm text-gray-700">
+            <span class="text-sm text-slate-500 dark:text-slate-400">Time Left</span>
+            <span class="text-sm text-slate-700 dark:text-slate-200">
                 {% if token_details.expires_in_hours and token_details.expires_in_hours > 0 %}
                     {{ token_details.expires_in_hours }}h
                 {% else %}
@@ -59,7 +59,7 @@
         {% endif %}
     </div>
 
-    <div class="mt-4 pt-4 border-t">
+    <div class="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
         <a href="{{ auth_url }}" target="_blank"
            class="block text-center bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
             Re-authorize
