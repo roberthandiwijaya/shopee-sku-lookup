@@ -1,4 +1,6 @@
 import math
+import re
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, or_, select
@@ -8,6 +10,8 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.models.product import AuthAlert, Product, ProductModel, ShopeeToken, ShopInfo, TZ_GMT7
 from app.schemas.product import ProductOut, ProductSearchResponse
+
+FAMILY_CODE_PATTERN = re.compile(r"\b([A-Z]{1,5}-\d{2,6})\b", re.IGNORECASE)
 
 
 async def lookup_by_skus(
@@ -61,43 +65,135 @@ async def get_sync_stats(session: AsyncSession) -> dict:
     }
 
 
+def _get_product_image_urls(product: Product) -> list[str]:
+    images = product.images if isinstance(product.images, list) else []
+    return [image.strip() for image in images if isinstance(image, str) and image.strip()]
+
+
+
+def _get_primary_image_url(product: Product) -> str | None:
+    images = _get_product_image_urls(product)
+    return images[0] if images else None
+
+
+def normalize_family_code(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().upper()
+    if not normalized:
+        return None
+    match = FAMILY_CODE_PATTERN.fullmatch(normalized)
+    if not match:
+        raise ValueError("Family code must look like MP-8002")
+    return match.group(1)
+
+
 async def list_products_paginated(
-    session: AsyncSession, page: int = 1, per_page: int = 25, search_sku: str | None = None
+    session: AsyncSession,
+    page: int = 1,
+    per_page: int = 25,
+    search_sku: str | None = None,
+    partner_filter: str | None = None,
 ) -> dict:
-    """List products with pagination and optional SKU search."""
+    """List products with pagination, search, and partner filters."""
     base = select(Product).options(selectinload(Product.models))
 
     if search_sku:
         pattern = f"%{search_sku}%"
+        normalized_search = search_sku.strip().upper()
         base = (
             base.outerjoin(Product.models)
             .where(
                 or_(
                     Product.item_name.ilike(pattern),
                     Product.item_sku.ilike(pattern),
+                    Product.family_code.ilike(pattern),
                     ProductModel.model_sku.ilike(pattern),
+                    Product.family_code == normalized_search,
                 )
             )
             .distinct()
         )
 
-    # Count total
-    count_stmt = select(func.count()).select_from(base.subquery())
-    total = await session.scalar(count_stmt) or 0
-    total_pages = max(1, math.ceil(total / per_page))
-
-    # Fetch page
-    offset = (page - 1) * per_page
-    stmt = base.order_by(Product.item_name).offset(offset).limit(per_page)
-    result = await session.execute(stmt)
+    result = await session.execute(base.order_by(Product.item_name))
     products = result.scalars().unique().all()
 
+    family_counts: dict[str, int] = defaultdict(int)
+    for product in products:
+        if product.family_code:
+            family_counts[product.family_code] += 1
+
+    enriched_products: list[Product] = []
+    for product in products:
+        product.image_urls = _get_product_image_urls(product)
+        product.primary_image_url = product.image_urls[0] if product.image_urls else None
+        product.partner_count = family_counts.get(product.family_code, 0) - 1 if product.family_code else 0
+        product.has_partners = product.partner_count > 0
+        enriched_products.append(product)
+
+    if partner_filter == "has_partners":
+        enriched_products = [product for product in enriched_products if product.has_partners]
+    elif partner_filter == "no_partners":
+        enriched_products = [product for product in enriched_products if not product.has_partners]
+    elif partner_filter == "has_family_code":
+        enriched_products = [product for product in enriched_products if product.family_code]
+    elif partner_filter == "no_family_code":
+        enriched_products = [product for product in enriched_products if not product.family_code]
+
+    total = len(enriched_products)
+    total_pages = max(1, math.ceil(total / per_page))
+
+    offset = (page - 1) * per_page
+    paged_products = enriched_products[offset: offset + per_page]
+
     return {
-        "products": products,
+        "products": paged_products,
         "total": total,
         "page": page,
         "per_page": per_page,
         "total_pages": total_pages,
+        "partner_filter": partner_filter,
+    }
+
+
+async def get_product_by_item_id(session: AsyncSession, item_id: int) -> Product | None:
+    return await session.scalar(
+        select(Product)
+        .options(selectinload(Product.models))
+        .where(Product.item_id == item_id)
+    )
+
+
+async def update_product_family_code(
+    session: AsyncSession, item_id: int, family_code: str | None
+) -> Product | None:
+    product = await get_product_by_item_id(session, item_id)
+    if product is None:
+        return None
+    product.family_code = normalize_family_code(family_code)
+    await session.commit()
+    await session.refresh(product)
+    return product
+
+
+async def get_related_products(session: AsyncSession, item_id: int) -> dict:
+    product = await get_product_by_item_id(session, item_id)
+    if product is None:
+        return {"product": None, "models": [], "related_products": []}
+
+    related_products: list[Product] = []
+    if product.family_code:
+        result = await session.execute(
+            select(Product)
+            .where(Product.family_code == product.family_code, Product.item_id != item_id)
+            .order_by(Product.item_name)
+        )
+        related_products = result.scalars().all()
+
+    return {
+        "product": product,
+        "models": product.models,
+        "related_products": related_products,
     }
 
 

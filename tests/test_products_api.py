@@ -37,6 +37,15 @@ async def test_get_products_multiple_skus(client, seed_products):
 
 
 @pytest.mark.asyncio
+async def test_sync_status_counts_all_seeded_products(client, seed_products):
+    resp = await client.get("/api/sync/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_products"] == 4
+    assert data["total_models"] == 2
+
+
+@pytest.mark.asyncio
 async def test_get_products_not_found(client, seed_products):
     resp = await client.get("/api/products", params={"sku": "NONEXISTENT"}, headers=API_HEADERS)
     assert resp.status_code == 200
@@ -68,7 +77,7 @@ async def test_sync_status(client, seed_products):
     resp = await client.get("/api/sync/status")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["total_products"] == 2
+    assert data["total_products"] == 4
     assert data["total_models"] == 2
     assert data["token_status"] in ("healthy", "expiring_soon", "expired", "missing")
 
@@ -143,6 +152,6 @@ async def test_sync_status_token_expired(client):
 
 @pytest.mark.asyncio
 async def test_root(client):
-    resp = await client.get("/")
-    assert resp.status_code == 200
-    assert "Shopee SKU Dashboard" in resp.text
+    resp = await client.get("/", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/login"

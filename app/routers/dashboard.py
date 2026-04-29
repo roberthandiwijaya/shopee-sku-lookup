@@ -38,7 +38,14 @@ def _format_wib(dt: datetime | None, fmt: str = "%d %b %Y %H:%M") -> str:
     return dt.strftime(fmt) + " WIB"
 
 
+def _format_currency(value) -> str:
+    if value is None:
+        return "-"
+    return f"{float(value):,.0f}".replace(",", ".")
+
+
 templates.env.filters["wib"] = _format_wib
+templates.env.filters["idr"] = _format_currency
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -99,19 +106,48 @@ async def partial_auth(request: Request, session: AsyncSession = Depends(get_ses
     })
 
 
+@router.get("/partials/product-table", response_class=HTMLResponse)
+async def partial_product_table(
+    request: Request,
+    page: int = 1,
+    search: str = "",
+    partner_filter: str = "",
+    session: AsyncSession = Depends(get_session),
+):
+    """Full product table fragment with filter state."""
+    paginated = await product_service.list_products_paginated(
+        session,
+        page=page,
+        per_page=25,
+        search_sku=search or None,
+        partner_filter=partner_filter or None,
+    )
+    return templates.TemplateResponse(request, "partials/product_table.html", {
+        "search": search,
+        "partner_filter": partner_filter,
+        **paginated,
+    })
+
+
 @router.get("/partials/products", response_class=HTMLResponse)
 async def partial_products(
     request: Request,
     page: int = 1,
     search: str = "",
+    partner_filter: str = "",
     session: AsyncSession = Depends(get_session),
 ):
     """Product rows fragment (htmx search + pagination)."""
     paginated = await product_service.list_products_paginated(
-        session, page=page, per_page=25, search_sku=search or None,
+        session,
+        page=page,
+        per_page=25,
+        search_sku=search or None,
+        partner_filter=partner_filter or None,
     )
     return templates.TemplateResponse(request, "partials/product_rows.html", {
         "search": search,
+        "partner_filter": partner_filter,
         **paginated,
     })
 
@@ -122,18 +158,14 @@ async def partial_product_models(
     item_id: int,
     session: AsyncSession = Depends(get_session),
 ):
-    """Variant rows fragment for expanding a product."""
-    stmt = (
-        select(Product)
-        .options(selectinload(Product.models))
-        .where(Product.item_id == item_id)
-    )
-    result = await session.execute(stmt)
-    product = result.scalar_one_or_none()
-    models = product.models if product else []
+    """Variant and related-product rows fragment for expanding a product."""
+    detail = await product_service.get_related_products(session, item_id)
 
     return templates.TemplateResponse(request, "partials/product_models.html", {
-        "models": models,
+        "page": request.query_params.get("page", "1"),
+        "search": request.query_params.get("search", ""),
+        "partner_filter": request.query_params.get("partner_filter", ""),
+        **detail,
     })
 
 
@@ -310,6 +342,62 @@ async def discount_delete(
     access_token = await get_valid_token(settings.shopee_shop_id)
     await discount_service.delete_discount(settings.shopee_shop_id, access_token, discount_id)
     return RedirectResponse("/discounts", status_code=303)
+
+
+@router.get("/partials/products/{item_id}/family-code/edit", response_class=HTMLResponse)
+async def partial_product_family_code_edit(
+    request: Request,
+    item_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Inline editor for a single product family code."""
+    product = await product_service.get_product_by_item_id(session, item_id)
+    if not product:
+        return HTMLResponse("Product not found", status_code=404)
+
+    return templates.TemplateResponse(request, "partials/product_family_code_form.html", {
+        "product": product,
+        "error": None,
+        "submitted_value": None,
+        "page": request.query_params.get("page", "1"),
+        "search": request.query_params.get("search", ""),
+        "partner_filter": request.query_params.get("partner_filter", ""),
+    })
+
+
+@router.post("/partials/products/{item_id}/family-code/edit", response_class=HTMLResponse)
+async def partial_product_family_code_edit_submit(
+    request: Request,
+    item_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Save an inline family code edit and return the updated detail panel."""
+    product = await product_service.get_product_by_item_id(session, item_id)
+    if not product:
+        return HTMLResponse("Product not found", status_code=404)
+
+    form = await request.form()
+    family_code = form.get("family_code")
+
+    try:
+        await product_service.update_product_family_code(session, item_id, family_code)
+    except ValueError as exc:
+        return templates.TemplateResponse(request, "partials/product_family_code_form.html", {
+            "product": product,
+            "error": str(exc),
+            "submitted_value": family_code,
+            "page": request.query_params.get("page", "1"),
+            "search": request.query_params.get("search", ""),
+            "partner_filter": request.query_params.get("partner_filter", ""),
+        }, status_code=400)
+
+    detail = await product_service.get_related_products(session, item_id)
+    return templates.TemplateResponse(request, "partials/product_models.html", {
+        "page": request.query_params.get("page", "1"),
+        "search": request.query_params.get("search", ""),
+        "partner_filter": request.query_params.get("partner_filter", ""),
+        **detail,
+    })
 
 
 @router.post("/partials/discount-sync-trigger", response_class=HTMLResponse)
