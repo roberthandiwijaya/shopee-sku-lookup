@@ -11,7 +11,7 @@ from app.config import settings
 from app.models.product import AuthAlert, Product, ProductModel, ShopeeToken, ShopInfo, TZ_GMT7
 from app.schemas.product import ProductOut, ProductSearchResponse
 
-FAMILY_CODE_PATTERN = re.compile(r"\b([A-Z]{1,5}-\d{2,6})\b", re.IGNORECASE)
+FAMILY_CODE_PATTERN = re.compile(r"\b([A-Z]{1,5}-[A-Z0-9]{2,10})\b", re.IGNORECASE)
 
 
 async def lookup_by_skus(
@@ -131,7 +131,55 @@ def _build_family_card(family_code: str, products: list[Product]) -> dict:
     }
 
 
-async def list_linked_product_families(session: AsyncSession) -> list[dict]:
+def _normalize_variant_term(value: str) -> str:
+    normalized = " ".join(value.strip().upper().split())
+    normalized = normalized.replace("×", "X")
+    normalized = normalized.replace(" X ", "X")
+    normalized = normalized.replace(" X", "X")
+    normalized = normalized.replace("X ", "X")
+    return normalized
+
+
+def _normalize_linked_product_variants(variants: list[str] | None) -> list[str]:
+    if not variants:
+        return []
+
+    normalized_variants: list[str] = []
+    seen: set[str] = set()
+    for value in variants:
+        for part in value.split(","):
+            normalized = _normalize_variant_term(part)
+            if normalized and normalized not in seen:
+                normalized_variants.append(normalized)
+                seen.add(normalized)
+    return normalized_variants
+
+
+def _matches_variant_filters(products: list[Product], variants: list[str], min_stock: int) -> bool:
+    if not variants:
+        return True
+
+    matched_variants: set[str] = set()
+    for requested_variant in variants:
+        for product in products:
+            for model in product.models:
+                model_name = _normalize_variant_term(model.model_name or "")
+                if requested_variant in model_name and (model.stock or 0) >= min_stock:
+                    matched_variants.add(requested_variant)
+                    break
+            if requested_variant in matched_variants:
+                break
+
+    return len(matched_variants) == len(variants)
+
+
+async def list_linked_product_families(
+    session: AsyncSession,
+    jenis_bahan: str | None = None,
+    family_code: str | None = None,
+    variants: list[str] | None = None,
+    min_stock: int = 1,
+) -> list[dict]:
     result = await session.execute(
         select(Product)
         .options(selectinload(Product.models))
@@ -140,14 +188,36 @@ async def list_linked_product_families(session: AsyncSession) -> list[dict]:
     )
     products = result.scalars().all()
 
+    normalized_jenis_bahan = normalize_jenis_bahan(jenis_bahan)
+    normalized_family_code = normalize_family_code(family_code) if family_code else None
+    normalized_variants = _normalize_linked_product_variants(variants)
+    minimum_stock = max(min_stock, 1)
+
     grouped: dict[str, list[Product]] = defaultdict(list)
     for product in products:
         grouped[product.family_code].append(product)
 
+    filtered_groups: dict[str, list[Product]] = {}
+    for grouped_family_code, family_products in grouped.items():
+        if len(family_products) <= 1:
+            continue
+        if normalized_family_code and grouped_family_code != normalized_family_code:
+            continue
+        if normalized_jenis_bahan:
+            family_jenis_values = {
+                normalize_jenis_bahan(product.jenis_bahan).upper()
+                for product in family_products
+                if product.jenis_bahan
+            }
+            if normalized_jenis_bahan.upper() not in family_jenis_values:
+                continue
+        if not _matches_variant_filters(family_products, normalized_variants, minimum_stock):
+            continue
+        filtered_groups[grouped_family_code] = family_products
+
     family_cards = [
-        _build_family_card(family_code, family_products)
-        for family_code, family_products in grouped.items()
-        if len(family_products) > 1
+        _build_family_card(grouped_family_code, family_products)
+        for grouped_family_code, family_products in filtered_groups.items()
     ]
     return sorted(family_cards, key=lambda card: card["family_code"])
 
@@ -160,7 +230,7 @@ def normalize_family_code(value: str | None) -> str | None:
         return None
     match = FAMILY_CODE_PATTERN.fullmatch(normalized)
     if not match:
-        raise ValueError("Family code must look like MP-8002")
+        raise ValueError("Family code must look like MP-8002 or VR-JE9002")
     return match.group(1)
 
 

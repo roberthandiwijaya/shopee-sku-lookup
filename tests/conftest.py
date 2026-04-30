@@ -147,7 +147,41 @@ async def seed_products():
             created_at=now,
             updated_at=now,
         )
-        session.add_all([p1, p2, p3, p4, p5, p6])
+        p7 = Product(
+            shop_id=1,
+            item_id=1007,
+            item_sku="PARENT-SKU-7",
+            item_name="Sprei Microtex Deluxe",
+            item_status="NORMAL",
+            currency="IDR",
+            current_price=180000,
+            stock=None,
+            images=["https://example.com/sprei-microtex-1.jpg"],
+            family_code="VR-JE9002",
+            jenis_bahan="Microtex",
+            has_model=True,
+            synced_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        p8 = Product(
+            shop_id=1,
+            item_id=1008,
+            item_sku="PARENT-SKU-8",
+            item_name="Bedcover Microtex Deluxe",
+            item_status="NORMAL",
+            currency="IDR",
+            current_price=230000,
+            stock=None,
+            images=["https://example.com/bedcover-microtex-1.jpg"],
+            family_code="VR-JE9002",
+            jenis_bahan="Microtex",
+            has_model=True,
+            synced_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add_all([p1, p2, p3, p4, p5, p6, p7, p8])
         await session.flush()
 
         m1 = ProductModel(
@@ -174,7 +208,55 @@ async def seed_products():
             created_at=now,
             updated_at=now,
         )
-        session.add_all([m1, m2])
+        m3 = ProductModel(
+            product_id=p7.id,
+            item_id=1007,
+            model_id=5003,
+            model_sku="CHILD-SKU-7A",
+            model_name="100x200",
+            current_price=185000,
+            stock=1,
+            synced_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        m4 = ProductModel(
+            product_id=p7.id,
+            item_id=1007,
+            model_id=5004,
+            model_sku="CHILD-SKU-7B",
+            model_name="120x200",
+            current_price=190000,
+            stock=3,
+            synced_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        m5 = ProductModel(
+            product_id=p8.id,
+            item_id=1008,
+            model_id=5005,
+            model_sku="CHILD-SKU-8A",
+            model_name="160x240",
+            current_price=235000,
+            stock=1,
+            synced_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        m6 = ProductModel(
+            product_id=p8.id,
+            item_id=1008,
+            model_id=5006,
+            model_sku="CHILD-SKU-8B",
+            model_name="180x200",
+            current_price=240000,
+            stock=0,
+            synced_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add_all([m1, m2, m3, m4, m5, m6])
         await session.commit()
 
 
