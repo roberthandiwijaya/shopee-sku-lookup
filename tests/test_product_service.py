@@ -19,8 +19,9 @@ async def test_list_linked_product_families_groups_multi_product_families(seed_p
     async with TestSession() as session:
         family_cards = await product_service.list_linked_product_families(session)
 
-    assert [card["family_code"] for card in family_cards] == ["BC-1001", "MP-8002"]
-    assert {product.item_id for product in family_cards[1]["products"]} == {1001, 1002}
+    assert [card["family_code"] for card in family_cards] == ["BC-1001", "MP-8002", "VR-JE9002"]
+    assert {product.item_id for product in next(card for card in family_cards if card["family_code"] == "MP-8002")["products"]} == {1001, 1002}
+    assert {product.item_id for product in next(card for card in family_cards if card["family_code"] == "VR-JE9002")["products"]} == {1007, 1008}
 
 
 @pytest.mark.asyncio
@@ -46,12 +47,82 @@ async def test_list_linked_product_families_falls_back_to_bedcover(seed_products
 
 
 @pytest.mark.asyncio
+async def test_list_linked_product_families_filters_by_jenis_bahan(seed_products):
+    async with TestSession() as session:
+        family_cards = await product_service.list_linked_product_families(session, jenis_bahan="microtex")
+
+    assert [card["family_code"] for card in family_cards] == ["MP-8002", "VR-JE9002"]
+
+
+@pytest.mark.asyncio
+async def test_list_linked_product_families_filters_by_family_code(seed_products):
+    async with TestSession() as session:
+        family_cards = await product_service.list_linked_product_families(session, family_code="vr-je9002")
+
+    assert [card["family_code"] for card in family_cards] == ["VR-JE9002"]
+
+
+@pytest.mark.asyncio
+async def test_list_linked_product_families_filters_by_family_variant_match(seed_products):
+    async with TestSession() as session:
+        family_cards = await product_service.list_linked_product_families(
+            session,
+            variants=["100x200", "160x240"],
+        )
+
+    assert [card["family_code"] for card in family_cards] == ["VR-JE9002"]
+
+
+@pytest.mark.asyncio
+async def test_list_linked_product_families_supports_partial_and_mixed_width_variant_terms(seed_products):
+    async with TestSession() as session:
+        partial_cards = await product_service.list_linked_product_families(
+            session,
+            variants=["100", "160x240"],
+        )
+        spaced_cards = await product_service.list_linked_product_families(
+            session,
+            variants=["160 x 240"],
+        )
+        multiplied_cards = await product_service.list_linked_product_families(
+            session,
+            variants=["160×240"],
+        )
+
+    assert [card["family_code"] for card in partial_cards] == ["VR-JE9002"]
+    assert [card["family_code"] for card in spaced_cards] == ["VR-JE9002"]
+    assert [card["family_code"] for card in multiplied_cards] == ["VR-JE9002"]
+
+
+@pytest.mark.asyncio
+async def test_list_linked_product_families_excludes_missing_or_understocked_variants(seed_products):
+    async with TestSession() as session:
+        missing_variant_cards = await product_service.list_linked_product_families(
+            session,
+            variants=["100x200", "200x200"],
+        )
+        understocked_cards = await product_service.list_linked_product_families(
+            session,
+            variants=["100x200", "180x200"],
+        )
+        threshold_cards = await product_service.list_linked_product_families(
+            session,
+            variants=["100x200", "160x240"],
+            min_stock=2,
+        )
+
+    assert missing_variant_cards == []
+    assert understocked_cards == []
+    assert threshold_cards == []
+
+
+@pytest.mark.asyncio
 async def test_list_products_filters_has_partners(seed_products):
     async with TestSession() as session:
         result = await product_service.list_products_paginated(session, partner_filter="has_partners")
 
     item_ids = {product.item_id for product in result["products"]}
-    assert item_ids == {1001, 1002, 1005, 1006}
+    assert item_ids == {1001, 1002, 1005, 1006, 1007, 1008}
     assert all(product.has_partners for product in result["products"])
 
 
@@ -70,7 +141,7 @@ async def test_list_products_filters_has_family_code(seed_products):
         result = await product_service.list_products_paginated(session, partner_filter="has_family_code")
 
     item_ids = {product.item_id for product in result["products"]}
-    assert item_ids == {1001, 1002, 1003, 1005, 1006}
+    assert item_ids == {1001, 1002, 1003, 1005, 1006, 1007, 1008}
 
 
 @pytest.mark.asyncio
@@ -103,10 +174,10 @@ async def test_get_related_products_returns_empty_for_unknown_item(seed_products
 @pytest.mark.asyncio
 async def test_update_product_family_code_normalizes_value(seed_products):
     async with TestSession() as session:
-        product = await product_service.update_product_family_code(session, 1004, " mp-7001 ")
+        product = await product_service.update_product_family_code(session, 1004, " vr-je9002 ")
 
     assert product is not None
-    assert product.family_code == "MP-7001"
+    assert product.family_code == "VR-JE9002"
 
 
 @pytest.mark.asyncio

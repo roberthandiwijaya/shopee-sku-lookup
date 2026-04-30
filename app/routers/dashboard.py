@@ -389,7 +389,7 @@ async def partial_product_family_code_edit_submit(
             "page": request.query_params.get("page", "1"),
             "search": request.query_params.get("search", ""),
             "partner_filter": request.query_params.get("partner_filter", ""),
-        }, status_code=400)
+        })
 
     detail = await product_service.get_related_products(session, item_id)
     return templates.TemplateResponse(request, "partials/product_models.html", {

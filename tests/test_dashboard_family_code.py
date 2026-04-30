@@ -27,17 +27,17 @@ async def test_inline_family_code_edit_submit_updates_product_and_returns_detail
     resp = await logged_in_client.post(
         "/partials/products/1004/family-code/edit",
         headers=HTMX_HEADERS,
-        data={"family_code": "ab-1234"},
+        data={"family_code": "vr-je9002"},
         follow_redirects=False,
     )
     assert resp.status_code == 200
-    assert "Partner Products — AB-1234" in resp.text
+    assert "Partner Products — VR-JE9002" in resp.text
 
     async with TestSession() as session:
         product = await session.scalar(select(Product).where(Product.item_id == 1004))
 
     assert product is not None
-    assert product.family_code == "AB-1234"
+    assert product.family_code == "VR-JE9002"
 
 
 @pytest.mark.asyncio
@@ -66,8 +66,8 @@ async def test_inline_family_code_edit_submit_rejects_invalid_value(logged_in_cl
         data={"family_code": "invalid code"},
         follow_redirects=False,
     )
-    assert resp.status_code == 400
-    assert "Family code must look like MP-8002" in resp.text
+    assert resp.status_code == 200
+    assert "Family code must look like MP-8002 or VR-JE9002" in resp.text
     assert "Edit Family Code" in resp.text
 
 

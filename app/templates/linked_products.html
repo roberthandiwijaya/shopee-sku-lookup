@@ -15,6 +15,55 @@
                 {{ family_cards | length }} linked families
             </div>
         </div>
+
+        <form method="GET" action="/linked-products" class="mt-6 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_140px_auto]">
+            <div>
+                <label for="jenis_bahan" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Jenis Bahan</label>
+                <input id="jenis_bahan"
+                       type="text"
+                       name="jenis_bahan"
+                       value="{{ jenis_bahan or '' }}"
+                       placeholder="MICROTEX"
+                       class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+            </div>
+            <div>
+                <label for="family_code" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Family Code</label>
+                <input id="family_code"
+                       type="text"
+                       name="family_code"
+                       value="{{ family_code or '' }}"
+                       placeholder="MP-8002"
+                       class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+            </div>
+            <div>
+                <label for="variants" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Required Variants</label>
+                <input id="variants"
+                       type="text"
+                       name="variants"
+                       value="{{ variants or '' }}"
+                       placeholder="100x200, 160x240"
+                       class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+            </div>
+            <div>
+                <label for="min_stock" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Min Stock</label>
+                <input id="min_stock"
+                       type="number"
+                       min="1"
+                       name="min_stock"
+                       value="{{ min_stock or 1 }}"
+                       class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+            </div>
+            <div class="flex items-end gap-2 xl:justify-end">
+                <a href="/linked-products"
+                   class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Reset</a>
+                <button type="submit"
+                        class="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600">Apply Filters</button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 lg:col-span-2 xl:col-span-5">Variant filters match across the whole linked family. If you request multiple variants, each one must exist somewhere in that family with stock at or above the minimum.</p>
+            {% if filter_error %}
+            <div class="lg:col-span-2 xl:col-span-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">{{ filter_error }}</div>
+            {% endif %}
+        </form>
     </div>
 
     {% if family_cards %}
