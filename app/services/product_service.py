@@ -179,7 +179,9 @@ async def list_linked_product_families(
     family_code: str | None = None,
     variants: list[str] | None = None,
     min_stock: int = 1,
-) -> list[dict]:
+    page: int = 1,
+    per_page: int = 25,
+) -> dict:
     result = await session.execute(
         select(Product)
         .options(selectinload(Product.models))
@@ -215,23 +217,34 @@ async def list_linked_product_families(
             continue
         filtered_groups[grouped_family_code] = family_products
 
-    family_cards = [
-        _build_family_card(grouped_family_code, family_products)
-        for grouped_family_code, family_products in filtered_groups.items()
-    ]
-    return sorted(family_cards, key=lambda card: card["family_code"])
+    family_cards = sorted(
+        [
+            _build_family_card(grouped_family_code, family_products)
+            for grouped_family_code, family_products in filtered_groups.items()
+        ],
+        key=lambda card: card["family_code"],
+    )
+
+    total = len(family_cards)
+    total_pages = max(1, math.ceil(total / per_page))
+    current_page = min(max(page, 1), total_pages)
+    offset = (current_page - 1) * per_page
+    paged_family_cards = family_cards[offset: offset + per_page]
+
+    return {
+        "family_cards": paged_family_cards,
+        "total": total,
+        "page": current_page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+    }
 
 
 def normalize_family_code(value: str | None) -> str | None:
     if value is None:
         return None
-    normalized = value.strip().upper()
-    if not normalized:
-        return None
-    match = FAMILY_CODE_PATTERN.fullmatch(normalized)
-    if not match:
-        raise ValueError("Family code must look like MP-8002 or VR-JE9002")
-    return match.group(1)
+    normalized = " ".join(value.strip().upper().split())
+    return normalized or None
 
 
 def normalize_jenis_bahan(value: str | None) -> str | None:
@@ -261,6 +274,7 @@ async def list_products_paginated(
                     Product.item_name.ilike(pattern),
                     Product.item_sku.ilike(pattern),
                     Product.family_code.ilike(pattern),
+                    Product.jenis_bahan.ilike(pattern),
                     ProductModel.model_sku.ilike(pattern),
                     Product.family_code == normalized_search,
                 )
