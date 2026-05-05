@@ -25,7 +25,7 @@
                             hx-swap="innerHTML"
                             class="rounded-full border px-3 py-1 text-xs transition-colors {% if partner_filter == 'no_family_code' %}border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-500/60 dark:bg-orange-500/10 dark:text-orange-200{% else %}border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800{% endif %}">No code</button>
                 </div>
-                <div class="relative">
+                <div id="product-search-controls" class="relative">
                     <input type="hidden" name="partner_filter" value="{{ partner_filter or '' }}">
                     <input type="text"
                            name="search"
@@ -35,7 +35,7 @@
                            hx-trigger="input changed delay:300ms, search"
                            hx-target="#product-tbody"
                            hx-swap="innerHTML"
-                           hx-include="closest .flex"
+                           hx-include="#product-search-controls"
                            class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 sm:w-72">
                 </div>
             </div>

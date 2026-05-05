@@ -59,16 +59,15 @@ async def test_inline_family_code_edit_submit_allows_clearing(logged_in_client, 
 
 
 @pytest.mark.asyncio
-async def test_inline_family_code_edit_submit_rejects_invalid_value(logged_in_client, seed_products):
+async def test_inline_family_code_edit_submit_accepts_full_string_value(logged_in_client, seed_products):
     resp = await logged_in_client.post(
         "/partials/products/1001/family-code/edit",
         headers=HTMX_HEADERS,
-        data={"family_code": "invalid code"},
+        data={"family_code": "full string model 150x220"},
         follow_redirects=False,
     )
     assert resp.status_code == 200
-    assert "Family code must look like MP-8002 or VR-JE9002" in resp.text
-    assert "Edit Family Code" in resp.text
+    assert "Partner Products — FULL STRING MODEL 150X220" in resp.text
 
 
 @pytest.mark.asyncio
@@ -85,6 +84,29 @@ async def test_inline_family_code_edit_link_stays_on_dashboard_rows(logged_in_cl
     assert resp.status_code == 200
     assert 'hx-get="/partials/products/1001/family-code/edit?page=1"' in resp.text
     assert 'href="/products/1001/family-code/edit"' not in resp.text
+
+
+@pytest.mark.asyncio
+async def test_product_rows_pagination_preserves_partner_filter(logged_in_client, seed_products):
+    async with TestSession() as session:
+        for index in range(30):
+            session.add(Product(
+                shop_id=1,
+                item_id=2000 + index,
+                item_sku=f"NO-CODE-{index}",
+                item_name=f"No Code Product {index:02d}",
+                item_status="NORMAL",
+                currency="IDR",
+                current_price=100000,
+                stock=1,
+                has_model=False,
+            ))
+        await session.commit()
+
+    resp = await logged_in_client.get("/partials/products?partner_filter=no_family_code", headers=HTMX_HEADERS)
+
+    assert resp.status_code == 200
+    assert 'hx-get="/partials/products?page=2&partner_filter=no_family_code"' in resp.text
 
 
 @pytest.mark.asyncio
@@ -153,3 +175,22 @@ async def test_inline_jenis_bahan_edit_link_stays_on_dashboard_rows(logged_in_cl
     assert 'hx-get="/partials/products/1001/jenis-bahan/edit?page=1"' in resp.text
     assert 'href="/products/1001/jenis-bahan/edit"' not in resp.text
     assert "Katun Jepang" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_non_variant_product_rows_include_inline_edit_targets(logged_in_client, seed_products):
+    resp = await logged_in_client.get("/partials/products", headers=HTMX_HEADERS)
+    assert resp.status_code == 200
+    assert 'id="models-1004"' in resp.text
+    assert 'hx-get="/partials/products/1004/family-code/edit?page=1"' in resp.text
+    assert 'hx-get="/partials/products/1004/jenis-bahan/edit?page=1"' in resp.text
+
+
+@pytest.mark.asyncio
+async def test_non_variant_product_models_panel_returns_editable_panel(logged_in_client, seed_products):
+    resp = await logged_in_client.get("/partials/products/1004/models", headers=HTMX_HEADERS)
+    assert resp.status_code == 200
+    assert "Partner Products" in resp.text
+    assert "No partner products found for this family code." in resp.text
+    assert "Set family code" in resp.text
+    assert "Set jenis bahan" in resp.text
