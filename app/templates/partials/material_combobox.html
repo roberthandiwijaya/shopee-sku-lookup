@@ -1,0 +1,105 @@
+<div id="material-combobox" class="relative min-w-0">
+    <label id="material-combobox-label" for="jenis_bahan" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Jenis Bahan</label>
+    <div class="flex overflow-hidden rounded-xl border border-slate-300 bg-white focus-within:ring-2 focus-within:ring-orange-400 dark:border-slate-700 dark:bg-slate-900">
+        <input id="jenis_bahan" type="text" name="jenis_bahan" autocomplete="off"
+               role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="material-options"
+               value="{{ jenis_bahan or '' }}" placeholder="Choose or type Jenis Bahan"
+               class="min-w-0 w-full bg-transparent px-3 py-2 text-base text-slate-800 focus:outline-none dark:text-slate-100">
+        <button id="material-toggle" type="button" aria-label="Show material choices" aria-haspopup="listbox" aria-controls="material-options" aria-expanded="false"
+                class="flex min-h-[44px] min-w-[44px] items-center justify-center border-l border-slate-300 text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+    </div>
+    <div id="material-popup" hidden class="absolute left-0 right-0 z-50 mt-1 max-h-64 overflow-y-auto overscroll-contain rounded-xl border border-slate-300 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+        <div id="material-options" role="listbox" aria-labelledby="material-combobox-label">
+            <button id="material-option-all" type="button" role="option" tabindex="-1" aria-selected="false" data-material=""
+                    class="material-option block min-h-[44px] w-full break-words rounded-lg px-3 py-2 text-left text-base text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-800">All materials (clear filter)</button>
+            {% for material in jenis_bahan_options %}
+            <button id="material-option-{{ loop.index }}" type="button" role="option" tabindex="-1" aria-selected="false" data-material="{{ material }}"
+                    class="material-option block min-h-[44px] w-full break-words rounded-lg px-3 py-2 text-left text-base text-slate-700 hover:bg-orange-50 dark:text-slate-200 dark:hover:bg-slate-800">{{ material }}</button>
+            {% endfor %}
+        </div>
+        <p id="material-no-matches" hidden role="status" class="px-3 py-3 text-sm text-slate-500 dark:text-slate-400">No matching materials. You can still use your typed value.</p>
+    </div>
+</div>
+<style>
+    #material-combobox [hidden] { display: none !important; }
+    #material-popup { -webkit-overflow-scrolling: touch; }
+    #material-options .material-active { background: #ffedd5; color: #7c2d12; }
+</style>
+<script>
+(() => {
+    const root = document.getElementById('material-combobox');
+    const input = document.getElementById('jenis_bahan');
+    const toggle = document.getElementById('material-toggle');
+    const popup = document.getElementById('material-popup');
+    const empty = document.getElementById('material-no-matches');
+    const options = [...root.querySelectorAll('[data-material]')];
+    let active = -1;
+    const normalized = value => value.trim().toLocaleUpperCase();
+    const visible = () => options.filter(option => !option.hidden);
+    function mark(index) {
+        const items = visible();
+        active = index;
+        options.forEach(option => {
+            option.classList.remove('material-active');
+            option.setAttribute('aria-selected', String(normalized(option.dataset.material) === normalized(input.value)));
+        });
+        input.removeAttribute('aria-activedescendant');
+        if (items[index]) {
+            items[index].classList.add('material-active');
+            input.setAttribute('aria-activedescendant', items[index].id);
+            items[index].scrollIntoView({block: 'nearest'});
+        }
+    }
+    function open(showAll = false) {
+        const term = showAll ? '' : normalized(input.value);
+        options.forEach(option => { option.hidden = !!option.dataset.material && !normalized(option.dataset.material).includes(term); });
+        empty.hidden = options.some(option => option.dataset.material && !option.hidden);
+        popup.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-expanded', 'true');
+        mark(-1);
+    }
+    function close() {
+        popup.hidden = true;
+        input.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+        active = -1;
+    }
+    function choose(option) {
+        input.value = option.dataset.material;
+        input.focus({preventScroll: true});
+        close();
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    input.addEventListener('focus', () => open(true));
+    input.addEventListener('click', () => { if (popup.hidden) open(true); });
+    input.addEventListener('input', () => open());
+    toggle.addEventListener('click', () => {
+        const wasOpen = !popup.hidden;
+        if (wasOpen) { close(); }
+        else { input.focus({preventScroll: true}); open(true); }
+    });
+    options.forEach(option => {
+        option.addEventListener('mousedown', event => event.preventDefault());
+        option.addEventListener('click', () => choose(option));
+    });
+    input.addEventListener('keydown', event => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (popup.hidden) open(true);
+            const length = visible().length;
+            mark(event.key === 'ArrowDown' ? (active + 1) % length : (active < 0 ? length - 1 : (active - 1 + length) % length));
+        } else if (event.key === 'Enter' && !popup.hidden && active >= 0) {
+            event.preventDefault(); choose(visible()[active]);
+        } else if (event.key === 'Escape' && !popup.hidden) {
+            event.preventDefault(); event.stopPropagation(); close();
+        } else if (event.key === 'Tab') { close(); }
+    });
+    document.addEventListener('pointerdown', event => { if (!root.contains(event.target)) close(); });
+    root.addEventListener('focusout', event => { if (!root.contains(event.relatedTarget)) close(); });
+    input.form.addEventListener('submit', close);
+})();
+</script>
