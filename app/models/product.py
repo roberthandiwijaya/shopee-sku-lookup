@@ -42,6 +42,8 @@ class Product(Base):
     stock: Mapped[int | None] = mapped_column(Integer)
     images: Mapped[dict | None] = mapped_column(JsonType)
     category_id: Mapped[int | None] = mapped_column(BigInteger)
+    family_code: Mapped[str | None] = mapped_column(String(100), index=True)
+    jenis_bahan: Mapped[str | None] = mapped_column(String(255))
     has_model: Mapped[bool | None] = mapped_column(Boolean, default=False)
     raw_data: Mapped[dict | None] = mapped_column(JsonType)
     synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

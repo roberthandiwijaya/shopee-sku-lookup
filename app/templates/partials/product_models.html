@@ -1,32 +1,88 @@
-<div class="bg-orange-50 px-10 py-2">
-    <table class="w-full text-sm">
-        <thead class="text-xs text-gray-500 uppercase">
-            <tr>
-                <th class="px-4 py-2 text-left">Variant</th>
-                <th class="px-4 py-2 text-left">Model SKU</th>
-                <th class="px-4 py-2 text-right">Price</th>
-                <th class="px-4 py-2 text-right">Stock</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for model in models %}
-            <tr class="border-b border-orange-100 last:border-0">
-                <td class="px-4 py-2 text-gray-700">{{ model.model_name or '-' }}</td>
-                <td class="px-4 py-2 font-mono text-gray-600">{{ model.model_sku or '-' }}</td>
-                <td class="px-4 py-2 text-right text-gray-700">
-                    {% if model.current_price is not none %}
-                        {{ "%.2f" | format(model.current_price | float) }}
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
-                <td class="px-4 py-2 text-right text-gray-700">{{ model.stock if model.stock is not none else '-' }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="4" class="px-4 py-3 text-center text-gray-400">No variants found.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="border-t border-orange-100 bg-orange-50 px-10 py-4 dark:border-slate-800 dark:bg-slate-900/70">
+    {% if models %}
+    <div>
+        <h3 class="px-4 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Variants</h3>
+        <table class="w-full text-sm">
+            <thead class="text-xs uppercase text-slate-500 dark:text-slate-400">
+                <tr>
+                    <th class="px-4 py-2 text-left">Variant</th>
+                    <th class="px-4 py-2 text-left">Model SKU</th>
+                    <th class="px-4 py-2 text-right">Price</th>
+                    <th class="px-4 py-2 text-right">Stock</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for model in models %}
+                <tr class="border-b border-orange-100 last:border-0 dark:border-slate-800">
+                    <td class="px-4 py-2 text-slate-700 dark:text-slate-200">{{ model.model_name or '-' }}</td>
+                    <td class="px-4 py-2 font-mono text-slate-600 dark:text-slate-300">{{ model.model_sku or '-' }}</td>
+                    <td class="px-4 py-2 text-right text-slate-700 dark:text-slate-200">{{ model.current_price | idr }}</td>
+                    <td class="px-4 py-2 text-right text-slate-700 dark:text-slate-200">{{ model.stock if model.stock is not none else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if product %}
+    <div class="{% if models %}mt-4{% endif %}">
+        <div class="flex items-start justify-between gap-4 px-4 pb-2">
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {% if product.family_code %}Partner Products — {{ product.family_code }}{% else %}Partner Products{% endif %}
+                </h3>
+                <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    <span class="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        Jenis Bahan: {{ product.jenis_bahan or '-' }}
+                    </span>
+                </div>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+                <button type="button"
+                        hx-get="/partials/products/{{ product.item_id }}/family-code/edit?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+                        hx-target="#models-{{ product.item_id }}"
+                        hx-swap="innerHTML"
+                        class="text-xs font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200">
+                    {% if product.family_code %}Edit family code{% else %}Set family code{% endif %}
+                </button>
+                <button type="button"
+                        hx-get="/partials/products/{{ product.item_id }}/jenis-bahan/edit?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+                        hx-target="#models-{{ product.item_id }}"
+                        hx-swap="innerHTML"
+                        class="text-xs font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200">
+                    {% if product.jenis_bahan %}Edit jenis bahan{% else %}Set jenis bahan{% endif %}
+                </button>
+            </div>
+        </div>
+        <table class="w-full text-sm">
+            <thead class="text-xs uppercase text-slate-500 dark:text-slate-400">
+                <tr>
+                    <th class="px-4 py-2 text-left">Product Name</th>
+                    <th class="px-4 py-2 text-left">SKU</th>
+                    <th class="px-4 py-2 text-left">Status</th>
+                    <th class="px-4 py-2 text-right">Price</th>
+                    <th class="px-4 py-2 text-right">Stock</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for related in related_products %}
+                <tr class="border-b border-orange-100 last:border-0 dark:border-slate-800">
+                    <td class="px-4 py-2 text-slate-700 dark:text-slate-200">{{ related.item_name }}</td>
+                    <td class="px-4 py-2 font-mono text-slate-600 dark:text-slate-300">{{ related.item_sku or '-' }}</td>
+                    <td class="px-4 py-2 text-slate-600 dark:text-slate-300">{{ related.item_status or '-' }}</td>
+                    <td class="px-4 py-2 text-right text-slate-700 dark:text-slate-200">{{ related.current_price | idr }}</td>
+                    <td class="px-4 py-2 text-right text-slate-700 dark:text-slate-200">{{ related.stock if related.stock is not none else '-' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-4 py-3 text-center text-slate-400 dark:text-slate-500">No partner products found for this family code.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% elif not models %}
+    <div class="px-4 py-3 text-center text-slate-400 dark:text-slate-500">No variants or partner products found.</div>
+    {% endif %}
 </div>

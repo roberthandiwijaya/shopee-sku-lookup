@@ -1,0 +1,51 @@
+<div class="border-t border-orange-100 bg-orange-50 px-10 py-4 dark:border-slate-800 dark:bg-slate-900/70">
+    <div class="mx-4 rounded-lg bg-white p-4 shadow-sm dark:bg-slate-950 dark:ring-1 dark:ring-slate-800">
+        <div class="mb-4 flex items-start justify-between gap-4">
+            <div>
+                <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">Edit Family Code</h3>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ product.item_name }}</p>
+                <p class="mt-1 font-mono text-xs text-slate-400 dark:text-slate-500">{{ product.item_sku or '-' }}</p>
+            </div>
+            <button type="button"
+                    hx-get="/partials/products/{{ product.item_id }}/models?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+                    hx-target="#models-{{ product.item_id }}"
+                    hx-swap="innerHTML"
+                    class="text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                Cancel
+            </button>
+        </div>
+
+        <form hx-post="/partials/products/{{ product.item_id }}/family-code/edit?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+              hx-target="#models-{{ product.item_id }}"
+              hx-swap="innerHTML"
+              hx-on::after-request="if (event.detail.successful) { htmx.ajax('GET', '/partials/product-table?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}', {target:'#product-table-container', swap:'innerHTML'}); }"
+              class="space-y-3">
+            <div>
+                <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Family Code</label>
+                <input type="text"
+                       name="family_code"
+                       value="{{ submitted_value if submitted_value is not none else (product.family_code or '') }}"
+                       placeholder="MP-8002, VR-JE9002, or full model string"
+                       class="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Leave blank to unlink this product.</p>
+                {% if error %}
+                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+                {% endif %}
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <button type="button"
+                        hx-get="/partials/products/{{ product.item_id }}/models?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+                        hx-target="#models-{{ product.item_id }}"
+                        hx-swap="innerHTML"
+                        class="rounded border border-slate-300 px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="rounded bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

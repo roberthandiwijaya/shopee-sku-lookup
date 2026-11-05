@@ -1,6 +1,6 @@
-<div class="bg-white rounded-lg shadow p-6">
+<div class="rounded-lg bg-white p-6 shadow transition-colors dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-slate-800">
     <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold text-gray-800">Sync Status</h2>
+        <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100">Sync Status</h2>
         <span class="flex items-center space-x-2">
             {% if sync_stats.token_status == "healthy" %}
                 <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
@@ -15,24 +15,24 @@
         </span>
     </div>
 
-    <div class="grid grid-cols-3 gap-4 mb-4">
-        <div class="text-center p-3 bg-gray-50 rounded">
+    <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="rounded bg-slate-50 p-3 text-center dark:bg-slate-800/80">
             <div class="text-2xl font-bold text-orange-500">{{ sync_stats.total_products }}</div>
-            <div class="text-xs text-gray-500 mt-1">Products</div>
+            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Products</div>
         </div>
-        <div class="text-center p-3 bg-gray-50 rounded">
+        <div class="rounded bg-slate-50 p-3 text-center dark:bg-slate-800/80">
             <div class="text-2xl font-bold text-orange-500">{{ sync_stats.total_models }}</div>
-            <div class="text-xs text-gray-500 mt-1">Variants</div>
+            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Variants</div>
         </div>
-        <div class="text-center p-3 bg-gray-50 rounded">
-            <div class="text-sm font-medium text-gray-700 mt-1">
+        <div class="rounded bg-slate-50 p-3 text-center dark:bg-slate-800/80">
+            <div class="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                 {% if sync_stats.last_synced_at %}
                     {{ sync_stats.last_synced_at | wib }}
                 {% else %}
                     Never
                 {% endif %}
             </div>
-            <div class="text-xs text-gray-500 mt-1">Last Sync</div>
+            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Last Sync</div>
         </div>
     </div>
 

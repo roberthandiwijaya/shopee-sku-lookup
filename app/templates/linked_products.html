@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Linked Products{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-sm font-medium uppercase tracking-wide text-orange-500 dark:text-orange-300">Public Catalog</p>
+                <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">Linked Product Families</h1>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Grouped by family code with one representative image per linked family.</p>
+            </div>
+            <div class="rounded-xl bg-orange-50 px-4 py-3 text-sm text-orange-700 dark:bg-orange-500/10 dark:text-orange-200">
+                {{ total }} linked families
+            </div>
+        </div>
+
+        <form method="GET" action="/linked-products" class="mt-6 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_140px_140px_auto]">
+            {% include "partials/material_combobox.html" %}
+            <div>
+                <label for="family_code" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Family Code</label>
+                <input id="family_code"
+                       type="text"
+                       name="family_code"
+                       value="{{ family_code or '' }}"
+                       placeholder="MP-8002"
+                       class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+            </div>
+            <div>
+                <label for="variants" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Required Variants</label>
+                <input id="variants"
+                       type="text"
+                       name="variants"
+                       value="{{ variants or '' }}"
+                       placeholder="100x200, 160x240"
+                       class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+            </div>
+            <div>
+                <label for="min_stock" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Min Stock</label>
+                <input id="min_stock"
+                       type="number"
+                       min="1"
+                       name="min_stock"
+                       value="{{ min_stock or 1 }}"
+                       class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+            </div>
+            <div>
+                <label for="per_page" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Per Page</label>
+                <select id="per_page"
+                        name="per_page"
+                        class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                    {% for option in [10, 20, 50] %}
+                    <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-end gap-2 xl:justify-end">
+                <a href="/linked-products"
+                   class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Reset</a>
+                <button type="submit"
+                        class="inline-flex items-center justify-center rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600">Apply Filters</button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 lg:col-span-2 xl:col-span-5">Variant filters match across the whole linked family. If you request multiple variants, each one must exist somewhere in that family with stock at or above the minimum.</p>
+            {% if filter_error %}
+            <div class="lg:col-span-2 xl:col-span-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">{{ filter_error }}</div>
+            {% endif %}
+        </form>
+    </div>
+
+    {% if family_cards %}
+    <div class="space-y-6">
+        {% for family in family_cards %}
+        <article class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-colors dark:bg-slate-900 dark:ring-slate-800">
+            <div class="grid gap-0 lg:grid-cols-[180px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)]">
+                <div class="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60 lg:border-b-0 lg:border-r">
+                    {% if family.primary_image_url %}
+                    <button type="button"
+                            onclick='openImageModal({{ family.image_urls|tojson }}, 0, {{ family.image_source_label|tojson }})'
+                            class="group flex w-full flex-col"
+                            aria-label="Zoom image for {{ family.family_code }}">
+                        <div class="flex items-center justify-center p-4 lg:p-3 xl:p-4">
+                            <img src="{{ family.primary_image_url }}"
+                                 alt="{{ family.image_source_label or family.family_code }}"
+                                 class="h-36 w-full rounded-xl object-contain transition duration-200 group-hover:scale-[1.02] lg:h-32 xl:h-40"
+                                 onerror="this.closest('button').outerHTML = '<div class=&quot;flex h-44 w-full items-center justify-center bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500&quot;><span class=&quot;text-sm font-medium&quot;>Image unavailable</span></div>'">
+                        </div>
+                        <div class="flex items-center justify-between border-t border-slate-200 px-4 py-2 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                            <span class="truncate">{{ family.image_source_label }}</span>
+                            <span class="font-medium text-orange-600 dark:text-orange-300">Zoom</span>
+                        </div>
+                    </button>
+                    {% else %}
+                    <div class="flex h-44 w-full flex-col items-center justify-center gap-2 bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                        <svg class="h-10 w-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="text-sm font-medium">Image unavailable</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="p-5">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <div class="flex flex-wrap items-start gap-3">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Family Code</p>
+                                    <h2 class="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">{{ family.family_code }}</h2>
+                                </div>
+                                {% if family.jenis_bahan %}
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Jenis Bahan</p>
+                                    <div class="mt-1 inline-flex min-h-[2rem] items-center rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">{{ family.jenis_bahan }}</div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-xs">
+                            <span class="rounded-full bg-orange-100 px-3 py-1 font-medium text-orange-800 dark:bg-orange-500/10 dark:text-orange-200">{{ family.product_count }} products</span>
+                            {% if family.min_price is not none %}
+                            <span class="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                {% if family.min_price == family.max_price %}
+                                    {{ family.min_price | idr }}
+                                {% else %}
+                                    {{ family.min_price | idr }} - {{ family.max_price | idr }}
+                                {% endif %}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mt-4 space-y-3">
+                        {% for product in family.products %}
+                        <section class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/40">
+                            <div class="grid gap-3 p-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ product.item_name }}</div>
+                                            <div class="mt-1 break-all font-mono text-[11px] text-slate-500 dark:text-slate-400">{{ product.item_sku or '-' }}</div>
+                                        </div>
+                                        <div class="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ product.item_status or '-' }}</div>
+                                    </div>
+
+                                    {% if product.models %}
+                                    <div class="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                                        <div class="grid grid-cols-[minmax(0,1fr)_90px_80px] gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
+                                            <div>Variant</div>
+                                            <div class="text-right">Price</div>
+                                            <div class="text-right">Stock</div>
+                                        </div>
+                                        <div class="divide-y divide-slate-200 dark:divide-slate-800">
+                                            {% for model in product.models %}
+                                            <div class="grid grid-cols-[minmax(0,1fr)_90px_80px] gap-3 px-3 py-2 text-sm">
+                                                <div class="min-w-0">
+                                                    <div class="truncate font-medium text-slate-800 dark:text-slate-100">{{ model.model_name or '-' }}</div>
+                                                    <div class="truncate font-mono text-[11px] text-slate-500 dark:text-slate-400">{{ model.model_sku or '-' }}</div>
+                                                </div>
+                                                <div class="text-right font-medium text-slate-700 dark:text-slate-200">{{ model.current_price | idr }}</div>
+                                                <div class="text-right font-medium text-slate-700 dark:text-slate-200">{{ model.stock if model.stock is not none else '-' }} pcs</div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <div class="mt-3 rounded-lg border border-dashed border-slate-300 px-3 py-3 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">No variants</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-2 xl:grid-cols-1">
+                                    <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+                                        <div class="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Price</div>
+                                        <div class="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">{{ product.current_price | idr }}</div>
+                                    </div>
+                                    <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+                                        <div class="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Stock</div>
+                                        <div class="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">{{ product.display_stock if product.display_stock is not none else '-' }} pcs</div>
+                                    </div>
+                                    <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+                                        <div class="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Variants</div>
+                                        <div class="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">{{ product.models | length if product.models else 0 }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+        {% if total_pages > 1 %}
+        <div class="flex items-center justify-between rounded-2xl bg-white px-6 py-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+            <span class="text-sm text-slate-500 dark:text-slate-400">
+                Page {{ page }} of {{ total_pages }} ({{ total }} linked families)
+            </span>
+            <div class="flex gap-2">
+                {% if page > 1 %}
+                <a href="/linked-products?page={{ page - 1 }}{% if jenis_bahan %}&jenis_bahan={{ jenis_bahan | urlencode }}{% endif %}{% if family_code %}&family_code={{ family_code | urlencode }}{% endif %}{% if variants %}&variants={{ variants | urlencode }}{% endif %}{% if min_stock %}&min_stock={{ min_stock }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}"
+                   class="rounded border border-slate-300 px-3 py-1 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                    Previous
+                </a>
+                {% endif %}
+                {% if page < total_pages %}
+                <a href="/linked-products?page={{ page + 1 }}{% if jenis_bahan %}&jenis_bahan={{ jenis_bahan | urlencode }}{% endif %}{% if family_code %}&family_code={{ family_code | urlencode }}{% endif %}{% if variants %}&variants={{ variants | urlencode }}{% endif %}{% if min_stock %}&min_stock={{ min_stock }}{% endif %}{% if per_page %}&per_page={{ per_page }}{% endif %}"
+                   class="rounded border border-slate-300 px-3 py-1 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                    Next
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+        No linked product families found.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

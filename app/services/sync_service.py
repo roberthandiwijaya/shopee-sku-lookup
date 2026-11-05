@@ -89,6 +89,11 @@ async def _sync_item_batch(access_token: str, shop_id: int, item_ids: list[int])
 
             image_info = item.get("image", {})
             images = image_info.get("image_url_list", [])
+            existing_product = await session.scalar(
+                select(Product).where(Product.item_id == item_id)
+            )
+            existing_family_code = existing_product.family_code if existing_product else None
+            existing_jenis_bahan = existing_product.jenis_bahan if existing_product else None
 
             stmt = pg_insert(Product).values(
                 shop_id=shop_id,
@@ -103,6 +108,8 @@ async def _sync_item_batch(access_token: str, shop_id: int, item_ids: list[int])
                 stock=item.get("stock_info_v2", {}).get("summary_info", {}).get("total_available_stock"),
                 images=images,
                 category_id=item.get("category_id"),
+                family_code=existing_family_code,
+                jenis_bahan=existing_jenis_bahan,
                 has_model=has_model,
                 raw_data=item,
                 synced_at=now,
@@ -121,6 +128,8 @@ async def _sync_item_batch(access_token: str, shop_id: int, item_ids: list[int])
                     "stock": item.get("stock_info_v2", {}).get("summary_info", {}).get("total_available_stock"),
                     "images": images,
                     "category_id": item.get("category_id"),
+                    "family_code": existing_family_code,
+                    "jenis_bahan": existing_jenis_bahan,
                     "has_model": has_model,
                     "raw_data": item,
                     "synced_at": now,

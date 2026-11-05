@@ -5,29 +5,229 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Idola Style - Shopee SKU Dashboard{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class"
+        };
+    </script>
+    <script>
+        (function () {
+            var storageKey = "theme";
+            var root = document.documentElement;
+
+            function readTheme() {
+                try {
+                    return localStorage.getItem(storageKey);
+                } catch (error) {
+                    return null;
+                }
+            }
+
+            function writeTheme(theme) {
+                try {
+                    localStorage.setItem(storageKey, theme);
+                } catch (error) {
+                    // Ignore storage failures and still update the current page theme.
+                }
+            }
+
+            function isDarkMode() {
+                return root.classList.contains("dark");
+            }
+
+            function syncThemeToggle() {
+                var button = document.getElementById("theme-toggle");
+                if (!button) return;
+
+                var darkMode = isDarkMode();
+                var label = button.querySelector("[data-theme-label]");
+                var moonIcon = button.querySelector("[data-theme-icon='moon']");
+                var sunIcon = button.querySelector("[data-theme-icon='sun']");
+
+                if (label) {
+                    label.textContent = darkMode ? "Light" : "Dark";
+                }
+                if (moonIcon) {
+                    moonIcon.classList.toggle("hidden", darkMode);
+                }
+                if (sunIcon) {
+                    sunIcon.classList.toggle("hidden", !darkMode);
+                }
+
+                button.setAttribute("aria-pressed", darkMode ? "true" : "false");
+                button.setAttribute("title", darkMode ? "Switch to light mode" : "Switch to dark mode");
+            }
+
+            function applyTheme(theme) {
+                var darkMode = theme === "dark";
+                root.classList.toggle("dark", darkMode);
+                writeTheme(darkMode ? "dark" : "light");
+                syncThemeToggle();
+            }
+
+            var imageModalState = {
+                images: [],
+                index: 0,
+                alt: "Product image"
+            };
+
+            function renderImageModal() {
+                var modal = document.getElementById("image-modal");
+                var image = document.getElementById("image-modal-img");
+                var counter = document.getElementById("image-modal-counter");
+                var prevButton = document.getElementById("image-modal-prev");
+                var nextButton = document.getElementById("image-modal-next");
+                var thumbs = document.getElementById("image-modal-thumbs");
+                if (!modal || !image || !imageModalState.images.length) return;
+
+                var currentSrc = imageModalState.images[imageModalState.index];
+                image.src = currentSrc;
+                image.alt = imageModalState.alt;
+
+                if (counter) {
+                    counter.textContent = imageModalState.images.length > 1
+                        ? (imageModalState.index + 1) + ' / ' + imageModalState.images.length
+                        : '';
+                }
+                if (prevButton) {
+                    prevButton.classList.toggle('hidden', imageModalState.images.length < 2);
+                }
+                if (nextButton) {
+                    nextButton.classList.toggle('hidden', imageModalState.images.length < 2);
+                }
+                if (thumbs) {
+                    thumbs.innerHTML = '';
+                    if (imageModalState.images.length > 1) {
+                        imageModalState.images.forEach(function (src, index) {
+                            var button = document.createElement('button');
+                            button.type = 'button';
+                            button.className = 'overflow-hidden rounded border ' + (index === imageModalState.index
+                                ? 'border-orange-400 ring-2 ring-orange-300 dark:ring-orange-500/30'
+                                : 'border-slate-300 dark:border-slate-700');
+                            button.onclick = function () {
+                                imageModalState.index = index;
+                                renderImageModal();
+                            };
+
+                            var thumb = document.createElement('img');
+                            thumb.src = src;
+                            thumb.alt = imageModalState.alt;
+                            thumb.className = 'h-14 w-14 object-cover bg-white dark:bg-slate-900';
+                            button.appendChild(thumb);
+                            thumbs.appendChild(button);
+                        });
+                    }
+                }
+            }
+
+            function closeImageModal() {
+                var modal = document.getElementById("image-modal");
+                var image = document.getElementById("image-modal-img");
+                var thumbs = document.getElementById("image-modal-thumbs");
+                var counter = document.getElementById("image-modal-counter");
+                if (!modal || !image) return;
+                modal.classList.add("hidden");
+                modal.setAttribute("aria-hidden", "true");
+                image.removeAttribute("src");
+                image.setAttribute("alt", "");
+                if (thumbs) thumbs.innerHTML = '';
+                if (counter) counter.textContent = '';
+                imageModalState.images = [];
+                imageModalState.index = 0;
+                imageModalState.alt = "Product image";
+                document.body.classList.remove("overflow-hidden");
+            }
+
+            function openImageModal(images, index, alt) {
+                var modal = document.getElementById("image-modal");
+                var normalizedImages = Array.isArray(images) ? images.filter(Boolean) : [];
+                if (!modal || !normalizedImages.length) return;
+                imageModalState.images = normalizedImages;
+                imageModalState.index = Math.max(0, Math.min(index || 0, normalizedImages.length - 1));
+                imageModalState.alt = alt || "Product image";
+                renderImageModal();
+                modal.classList.remove("hidden");
+                modal.setAttribute("aria-hidden", "false");
+                document.body.classList.add("overflow-hidden");
+            }
+
+            function showPreviousImage() {
+                if (imageModalState.images.length < 2) return;
+                imageModalState.index = (imageModalState.index - 1 + imageModalState.images.length) % imageModalState.images.length;
+                renderImageModal();
+            }
+
+            function showNextImage() {
+                if (imageModalState.images.length < 2) return;
+                imageModalState.index = (imageModalState.index + 1) % imageModalState.images.length;
+                renderImageModal();
+            }
+
+            if (readTheme() === "dark") {
+                root.classList.add("dark");
+            }
+
+            window.toggleTheme = function () {
+                applyTheme(isDarkMode() ? "light" : "dark");
+            };
+            window.openImageModal = openImageModal;
+            window.closeImageModal = closeImageModal;
+            window.showPreviousImage = showPreviousImage;
+            window.showNextImage = showNextImage;
+
+            document.addEventListener("DOMContentLoaded", syncThemeToggle);
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape") {
+                    closeImageModal();
+                }
+                if (event.key === "ArrowLeft") {
+                    showPreviousImage();
+                }
+                if (event.key === "ArrowRight") {
+                    showNextImage();
+                }
+            });
+        })();
+    </script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <style>
+        :root { color-scheme: light; }
+        html.dark { color-scheme: dark; }
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: inline-block; }
         .htmx-request.htmx-indicator { display: inline-block; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <nav class="bg-orange-500 shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-6">
-                <span class="text-white text-xl font-bold">Idola Style - Shopee SKU Dashboard</span>
+<body class="min-h-screen bg-stone-100 text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
+    <nav class="bg-orange-500 shadow-lg transition-colors duration-200 dark:border-b dark:border-slate-800 dark:bg-slate-900">
+        <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <span class="text-xl font-bold text-white">Idola Style - Shopee SKU Dashboard</span>
+                <a href="/linked-products" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium {% if request.url.path.startswith('/linked-products') %}border-b-2 border-white dark:border-orange-300 pb-0.5{% endif %}">Linked Products</a>
                 {% if request.session.get("username") %}
-                <a href="/" class="text-orange-100 hover:text-white text-sm font-medium {% if request.url.path == '/' %}border-b-2 border-white pb-0.5{% endif %}">Dashboard</a>
-                <a href="/discounts" class="text-orange-100 hover:text-white text-sm font-medium {% if request.url.path.startswith('/discounts') %}border-b-2 border-white pb-0.5{% endif %}">Discounts</a>
+                <a href="/" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium {% if request.url.path == '/' %}border-b-2 border-white dark:border-orange-300 pb-0.5{% endif %}">Dashboard</a>
+                <a href="/discounts" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium {% if request.url.path.startswith('/discounts') %}border-b-2 border-white dark:border-orange-300 pb-0.5{% endif %}">Discounts</a>
                 {% endif %}
             </div>
-            <div class="flex items-center space-x-4">
-                <a href="/docs" target="_blank" class="text-orange-100 hover:text-white text-sm">API Docs</a>
+            <div class="flex flex-wrap items-center justify-end gap-4">
+                <button id="theme-toggle"
+                        type="button"
+                        onclick="toggleTheme()"
+                        aria-label="Toggle dark mode"
+                        class="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white transition-colors hover:bg-white/20 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
+                    <svg data-theme-icon="moon" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646a9 9 0 1011.708 11.708z"></path>
+                    </svg>
+                    <svg data-theme-icon="sun" class="hidden h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v2.25m0 13.5V21m9-9h-2.25M5.25 12H3m15.114 6.364l-1.59-1.59M7.476 7.476l-1.59-1.59m12.228 0l-1.59 1.59M7.476 16.524l-1.59 1.59M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span data-theme-label>Dark</span>
+                </button>
+                <a href="/docs" target="_blank" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm">API Docs</a>
                 {% if request.session.get("username") %}
-                <span class="text-orange-100 text-sm">{{ request.session["username"] }}</span>
-                <a href="/change-password" class="text-orange-100 hover:text-white text-sm">Change Password</a>
-                <a href="/logout" class="bg-orange-600 hover:bg-orange-700 text-white text-sm px-3 py-1 rounded">Logout</a>
+                <span class="text-orange-100 dark:text-slate-300 text-sm">{{ request.session["username"] }}</span>
+                <a href="/change-password" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm">Change Password</a>
+                <a href="/logout" class="bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-400 text-white text-sm px-3 py-1 rounded">Logout</a>
                 {% endif %}
             </div>
         </div>
@@ -36,5 +236,49 @@
     <main class="max-w-7xl mx-auto px-4 py-6">
         {% block content %}{% endblock %}
     </main>
+
+    <div id="image-modal"
+         class="fixed inset-0 z-50 hidden"
+         aria-hidden="true">
+        <div class="absolute inset-0 bg-black/75" onclick="closeImageModal()"></div>
+        <div class="relative flex min-h-screen items-center justify-center p-4">
+            <button type="button"
+                    id="image-modal-prev"
+                    onclick="showPreviousImage()"
+                    class="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white transition hover:bg-white/20"
+                    aria-label="Show previous product image">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <div class="flex max-w-[90vw] flex-col items-center gap-4">
+                <div class="flex items-center gap-3 text-white">
+                    <span id="image-modal-counter" class="text-sm font-medium"></span>
+                    <button type="button"
+                            onclick="closeImageModal()"
+                            class="rounded-full bg-white/10 p-2 transition hover:bg-white/20"
+                            aria-label="Close image zoom">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <img id="image-modal-img"
+                     src=""
+                     alt=""
+                     class="relative max-h-[75vh] max-w-[90vw] rounded-lg bg-white object-contain shadow-2xl dark:bg-slate-900">
+                <div id="image-modal-thumbs" class="flex flex-wrap justify-center gap-2"></div>
+            </div>
+            <button type="button"
+                    id="image-modal-next"
+                    onclick="showNextImage()"
+                    class="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white transition hover:bg-white/20"
+                    aria-label="Show next product image">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
 </body>
 </html>

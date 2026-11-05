@@ -1,7 +1,7 @@
 {% for discount in discounts %}
-<tr class="border-b hover:bg-gray-50">
+<tr class="border-b border-slate-200 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60">
     <td class="px-6 py-3">
-        <button class="text-gray-400 hover:text-blue-500 transition-colors"
+        <button class="text-slate-400 transition-colors hover:text-blue-500 dark:text-slate-500 dark:hover:text-blue-300"
                 onclick="
                     var svg = this.querySelector('svg');
                     var target = document.getElementById('discount-items-{{ discount.discount_id }}');
@@ -18,10 +18,10 @@
             </svg>
         </button>
     </td>
-    <td class="px-6 py-3 font-medium text-gray-800 max-w-xs truncate" title="{{ discount.discount_name }}">
+    <td class="max-w-xs truncate px-6 py-3 font-medium text-slate-800 dark:text-slate-100" title="{{ discount.discount_name }}">
         {{ discount.discount_name or '-' }}
     </td>
-    <td class="px-6 py-3 font-mono text-xs text-gray-500">
+    <td class="px-6 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
         {{ discount.discount_id }}
     </td>
     <td class="px-6 py-3">
@@ -30,14 +30,14 @@
         {% elif discount.discount_status == "upcoming" %}
             <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">Upcoming</span>
         {% elif discount.discount_status == "expired" %}
-            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">Expired</span>
+            <span class="px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">Expired</span>
         {% else %}
-            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">{{ discount.discount_status or '-' }}</span>
+            <span class="px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ discount.discount_status or '-' }}</span>
         {% endif %}
     </td>
-    <td class="px-6 py-3 text-gray-600 text-xs">{{ discount.start_time | wib }}</td>
-    <td class="px-6 py-3 text-gray-600 text-xs">{{ discount.end_time | wib }}</td>
-    <td class="px-6 py-3 text-right text-gray-700">{{ discount.items | length }}</td>
+    <td class="px-6 py-3 text-xs text-slate-600 dark:text-slate-300">{{ discount.start_time | wib }}</td>
+    <td class="px-6 py-3 text-xs text-slate-600 dark:text-slate-300">{{ discount.end_time | wib }}</td>
+    <td class="px-6 py-3 text-right text-slate-700 dark:text-slate-200">{{ discount.items | length }}</td>
     <td class="px-6 py-3">
         <div class="flex items-center gap-2 justify-end">
             <a href="/discounts/{{ discount.discount_id }}/edit"
@@ -68,7 +68,7 @@
 </tr>
 {% else %}
 <tr>
-    <td colspan="8" class="px-6 py-8 text-center text-gray-400">No discounts found.</td>
+    <td colspan="8" class="px-6 py-8 text-center text-slate-400 dark:text-slate-500">No discounts found.</td>
 </tr>
 {% endfor %}
 
@@ -76,7 +76,7 @@
 <tr>
     <td colspan="8" class="px-6 py-4">
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500">
+            <span class="text-sm text-slate-500 dark:text-slate-400">
                 Page {{ discount_page }} of {{ discount_total_pages }} ({{ discount_total }} discounts)
             </span>
             <div class="flex space-x-2">
@@ -84,7 +84,7 @@
                 <button hx-get="/partials/discounts?page={{ discount_page - 1 }}{% if discount_status %}&status={{ discount_status }}{% endif %}"
                         hx-target="#discount-tbody"
                         hx-swap="innerHTML"
-                        class="px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors">
+                        class="rounded border border-slate-300 px-3 py-1 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
                     Previous
                 </button>
                 {% endif %}
@@ -92,7 +92,7 @@
                 <button hx-get="/partials/discounts?page={{ discount_page + 1 }}{% if discount_status %}&status={{ discount_status }}{% endif %}"
                         hx-target="#discount-tbody"
                         hx-swap="innerHTML"
-                        class="px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors">
+                        class="rounded border border-slate-300 px-3 py-1 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
                     Next
                 </button>
                 {% endif %}

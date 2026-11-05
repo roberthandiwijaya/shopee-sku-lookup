@@ -1,8 +1,8 @@
 {% for product in products %}
-<tr class="border-b hover:bg-gray-50">
+<tr class="border-b border-slate-200 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60">
     <td class="px-6 py-3">
-        {% if product.has_model %}
-        <button class="text-gray-400 hover:text-orange-500 transition-colors"
+        {% if product.has_model or product.family_code %}
+        <button class="text-slate-400 transition-colors hover:text-orange-500 dark:text-slate-500 dark:hover:text-orange-300"
                 onclick="
                     var svg = this.querySelector('svg');
                     var target = document.getElementById('models-{{ product.item_id }}');
@@ -11,7 +11,7 @@
                         svg.classList.remove('rotate-90');
                     } else {
                         svg.classList.add('rotate-90');
-                        htmx.ajax('GET', '/partials/products/{{ product.item_id }}/models', {target: target, swap: 'innerHTML'});
+                        htmx.ajax('GET', '/partials/products/{{ product.item_id }}/models?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}', {target: target, swap: 'innerHTML'});
                     }
                 ">
             <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -20,41 +20,89 @@
         </button>
         {% endif %}
     </td>
-    <td class="px-6 py-3 font-medium text-gray-800 max-w-xs truncate" title="{{ product.item_name }}">
-        {{ product.item_name }}
+    <td class="px-6 py-3">
+        <div class="flex max-w-xs items-center gap-3" title="{{ product.item_name }}">
+            {% if product.primary_image_url %}
+            <button type="button"
+                    onclick='openImageModal({{ product.image_urls|tojson }}, 0, {{ product.item_name|tojson }})'
+                    class="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white transition hover:border-orange-300 hover:ring-2 hover:ring-orange-200 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-orange-400 dark:hover:ring-orange-500/20"
+                    aria-label="Zoom image for {{ product.item_name }}">
+                <img src="{{ product.primary_image_url }}"
+                     alt="{{ product.item_name }}"
+                     class="h-full w-full object-cover"
+                     onerror="this.parentElement.innerHTML = '<span class=&quot;text-slate-400 dark:text-slate-500&quot;><svg class=&quot;h-5 w-5&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; viewBox=&quot;0 0 24 24&quot;><path stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; stroke-width=&quot;2&quot; d=&quot;M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z&quot;></path></svg></span>'">
+            </button>
+            {% else %}
+            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-800">
+                <svg class="h-5 w-5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+            </div>
+            {% endif %}
+            <span class="min-w-0 truncate font-medium text-slate-800 dark:text-slate-100">
+                {{ product.item_name }}
+            </span>
+        </div>
     </td>
-    <td class="px-6 py-3 font-mono text-gray-600">{{ product.item_sku or '-' }}</td>
+    <td class="px-6 py-3 font-mono text-slate-600 dark:text-slate-300">
+        <div>{{ product.item_sku or '-' }}</div>
+        <div class="mt-1 flex flex-wrap items-center gap-2">
+            {% if product.family_code %}
+            <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                {{ product.family_code }}
+            </span>
+            {% endif %}
+            {% if product.jenis_bahan %}
+            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+                {{ product.jenis_bahan }}
+            </span>
+            {% endif %}
+            <button type="button"
+                    hx-get="/partials/products/{{ product.item_id }}/family-code/edit?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+                    hx-target="#models-{{ product.item_id }}"
+                    hx-swap="innerHTML"
+                    class="text-[11px] font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200">
+                {% if product.family_code %}Edit code{% else %}Set code{% endif %}
+            </button>
+            <button type="button"
+                    hx-get="/partials/products/{{ product.item_id }}/jenis-bahan/edit?page={{ page }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
+                    hx-target="#models-{{ product.item_id }}"
+                    hx-swap="innerHTML"
+                    class="text-[11px] font-medium text-orange-600 transition-colors hover:text-orange-700 dark:text-orange-300 dark:hover:text-orange-200">
+                {% if product.jenis_bahan %}Edit bahan{% else %}Set bahan{% endif %}
+            </button>
+        </div>
+    </td>
     <td class="px-6 py-3">
         {% if product.item_status == "NORMAL" %}
             <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">{{ product.item_status }}</span>
         {% elif product.item_status %}
-            <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{{ product.item_status }}</span>
+            <span class="px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200">{{ product.item_status }}</span>
         {% else %}
             -
         {% endif %}
     </td>
-    <td class="px-6 py-3 text-right text-gray-700">
-        {% if product.current_price is not none %}
-            {{ "%.2f" | format(product.current_price | float) }}
+    <td class="px-6 py-3 text-right text-slate-700 dark:text-slate-200">{{ product.current_price | idr }}</td>
+    <td class="px-6 py-3 text-right text-slate-700 dark:text-slate-200">{{ product.stock if product.stock is not none else '-' }}</td>
+    <td class="px-6 py-3 text-xs text-slate-500 dark:text-slate-400">
+        {% if product.has_partners %}
+            <span class="rounded-full bg-orange-100 px-2 py-1 text-[11px] font-medium text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">{{ product.partner_count }} related</span>
+        {% elif product.family_code %}
+            <span class="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">No partner</span>
         {% else %}
             -
         {% endif %}
-    </td>
-    <td class="px-6 py-3 text-right text-gray-700">{{ product.stock if product.stock is not none else '-' }}</td>
-    <td class="px-6 py-3 text-gray-500 text-xs">
-        {{ product.synced_at | wib }}
+        <div class="mt-1">{{ product.synced_at | wib }}</div>
     </td>
 </tr>
-{% if product.has_model %}
 <tr id="models-row-{{ product.item_id }}">
     <td colspan="7" class="p-0">
         <div id="models-{{ product.item_id }}"></div>
     </td>
 </tr>
-{% endif %}
 {% else %}
 <tr>
-    <td colspan="7" class="px-6 py-8 text-center text-gray-400">No products found.</td>
+    <td colspan="7" class="px-6 py-8 text-center text-slate-400 dark:text-slate-500">No products found.</td>
 </tr>
 {% endfor %}
 
@@ -62,23 +110,23 @@
 <tr>
     <td colspan="7" class="px-6 py-4">
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500">
+            <span class="text-sm text-slate-500 dark:text-slate-400">
                 Page {{ page }} of {{ total_pages }} ({{ total }} products)
             </span>
             <div class="flex space-x-2">
                 {% if page > 1 %}
-                <button hx-get="/partials/products?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}"
+                <button hx-get="/partials/products?page={{ page - 1 }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
                         hx-target="#product-tbody"
                         hx-swap="innerHTML"
-                        class="px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors">
+                        class="rounded border border-slate-300 px-3 py-1 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
                     Previous
                 </button>
                 {% endif %}
                 {% if page < total_pages %}
-                <button hx-get="/partials/products?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}"
+                <button hx-get="/partials/products?page={{ page + 1 }}{% if search %}&search={{ search | urlencode }}{% endif %}{% if partner_filter %}&partner_filter={{ partner_filter | urlencode }}{% endif %}"
                         hx-target="#product-tbody"
                         hx-swap="innerHTML"
-                        class="px-3 py-1 border rounded text-sm hover:bg-gray-50 transition-colors">
+                        class="rounded border border-slate-300 px-3 py-1 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
                     Next
                 </button>
                 {% endif %}

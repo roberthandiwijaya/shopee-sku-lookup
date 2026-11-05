@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Family Code — {{ product.item_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <a href="/" class="inline-flex items-center text-sm text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+            <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Back to Products
+        </a>
+    </div>
+
+    <form method="POST" action="/products/{{ product.item_id }}/family-code/edit">
+        <div class="rounded-lg bg-white p-6 shadow transition-colors dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-slate-800">
+            <h2 class="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-100">Edit Family Code</h2>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Product Name</label>
+                    <input type="text"
+                           value="{{ product.item_name }}"
+                           readonly
+                           class="w-full cursor-not-allowed rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">SKU</label>
+                    <input type="text"
+                           value="{{ product.item_sku or '-' }}"
+                           readonly
+                           class="w-full cursor-not-allowed rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Family Code</label>
+                    <input type="text"
+                           name="family_code"
+                           value="{{ product.family_code or '' }}"
+                           placeholder="MP-8002"
+                           class="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Leave blank to unlink this product.</p>
+                    {% if error %}
+                    <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 flex justify-end">
+            <a href="/"
+               class="mr-3 rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                Cancel
+            </a>
+            <button type="submit"
+                    class="rounded bg-orange-500 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600">
+                Save Changes
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

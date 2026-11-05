@@ -7,7 +7,7 @@
 
     <!-- Back link -->
     <div>
-        <a href="/discounts" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 transition-colors">
+        <a href="/discounts" class="inline-flex items-center text-sm text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
@@ -18,65 +18,65 @@
     <form method="POST" action="/discounts/{{ discount.discount_id }}/edit">
 
         <!-- Basic Information -->
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 class="text-lg font-semibold text-gray-800 mb-4">Basic Information</h2>
+        <div class="mb-6 rounded-lg bg-white p-6 shadow transition-colors dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-slate-800">
+            <h2 class="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-100">Basic Information</h2>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Promotion Name -->
                 <div class="md:col-span-1">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Promotion Name</label>
+                    <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Promotion Name</label>
                     <input type="text"
                            name="discount_name"
                            value="{{ discount.discount_name or '' }}"
-                           class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                           class="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 </div>
 
                 <!-- Start Time (read-only) -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
                         Start Time
                         {% if discount.discount_status == "ongoing" %}
-                        <span class="ml-1 text-xs text-gray-400">(cannot change while ongoing)</span>
+                        <span class="ml-1 text-xs text-slate-400 dark:text-slate-500">(cannot change while ongoing)</span>
                         {% endif %}
                     </label>
                     <input type="text"
                            value="{{ discount.start_time | wib }}"
                            readonly
-                           class="w-full border border-gray-200 rounded px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed">
+                           class="w-full cursor-not-allowed rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
                 </div>
 
                 <!-- End Time (editable) -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">End Time</label>
                     <input type="datetime-local"
                            name="end_time"
                            value="{% if discount.end_time %}{{ discount.end_time.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"
-                           class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                           class="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                 </div>
             </div>
 
             <div class="mt-2 flex items-center gap-2 text-sm">
-                <span class="text-gray-500">Status:</span>
+                <span class="text-slate-500 dark:text-slate-400">Status:</span>
                 {% if discount.discount_status == "ongoing" %}
                     <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">Ongoing</span>
                 {% elif discount.discount_status == "upcoming" %}
                     <span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800">Upcoming</span>
                 {% elif discount.discount_status == "expired" %}
-                    <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">Expired</span>
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">Expired</span>
                 {% else %}
-                    <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{{ discount.discount_status }}</span>
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ discount.discount_status }}</span>
                 {% endif %}
-                <span class="text-gray-400 font-mono text-xs ml-2">ID: {{ discount.discount_id }}</span>
+                <span class="ml-2 font-mono text-xs text-slate-400 dark:text-slate-500">ID: {{ discount.discount_id }}</span>
             </div>
         </div>
 
         <!-- Product Information -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-lg font-semibold text-gray-800 mb-4">Product Information</h2>
+        <div class="rounded-lg bg-white p-6 shadow transition-colors dark:bg-slate-900 dark:shadow-none dark:ring-1 dark:ring-slate-800">
+            <h2 class="mb-4 text-lg font-semibold text-slate-800 dark:text-slate-100">Product Information</h2>
 
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+                    <thead class="bg-slate-50 text-xs uppercase text-slate-600 dark:bg-slate-800/80 dark:text-slate-400">
                         <tr>
                             <th class="px-4 py-3 text-left">Product</th>
                             <th class="px-4 py-3 text-left">Variation</th>
@@ -94,7 +94,7 @@
                         <input type="hidden" name="item_id_{{ i.form_key }}" value="{{ i.shopee_item_id }}">
                         <input type="hidden" name="model_id_{{ i.form_key }}" value="{{ i.shopee_model_id }}">
 
-                        <tr class="border-b last:border-0 hover:bg-gray-50"
+                        <tr class="border-b border-slate-200 last:border-0 transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60"
                             data-orig="{{ i.original_price if i.original_price is not none else '' }}">
                             <!-- Product -->
                             <td class="px-4 py-3">
@@ -105,40 +105,34 @@
                                          class="w-10 h-10 object-cover rounded flex-shrink-0"
                                          onerror="this.style.display='none'">
                                     {% else %}
-                                    <div class="w-10 h-10 bg-gray-100 rounded flex-shrink-0 flex items-center justify-center">
-                                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-800">
+                                        <svg class="h-5 w-5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                         </svg>
                                     </div>
                                     {% endif %}
-                                    <span class="font-medium text-gray-800 text-xs leading-tight max-w-xs" title="{{ i.product_name }}">
+                                    <span class="max-w-xs text-xs font-medium leading-tight text-slate-800 dark:text-slate-100" title="{{ i.product_name }}">
                                         {{ i.product_name }}
                                     </span>
                                 </div>
                             </td>
                             <!-- Variation -->
-                            <td class="px-4 py-3 text-gray-600 text-xs">
+                            <td class="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
                                 {% if i.model_name %}
                                     {{ i.model_name }}
                                 {% else %}
-                                    <span class="text-gray-400 italic">(item-level)</span>
+                                    <span class="italic text-slate-400 dark:text-slate-500">(item-level)</span>
                                 {% endif %}
                             </td>
                             <!-- SKU -->
-                            <td class="px-4 py-3 font-mono text-xs text-gray-500">
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
                                 {{ i.model_sku or '-' }}
                             </td>
                             <!-- Original Price -->
-                            <td class="px-4 py-3 text-right text-gray-700 text-xs">
-                                {% if i.original_price is not none %}
-                                    {{ "{:,.0f}".format(i.original_price) }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
+                            <td class="px-4 py-3 text-right text-xs text-slate-700 dark:text-slate-200">{{ i.original_price | idr }}</td>
                             <!-- Stock -->
-                            <td class="px-4 py-3 text-right text-gray-700 text-xs">
+                            <td class="px-4 py-3 text-right text-xs text-slate-700 dark:text-slate-200">
                                 {% if i.stock is not none %}
                                     {{ i.stock }}
                                 {% else %}
@@ -151,7 +145,7 @@
                                        name="pct_{{ i.form_key }}"
                                        value="{{ i.discount_pct if i.discount_pct is not none else '' }}"
                                        min="0" max="99" step="1"
-                                       class="pct-input w-20 border border-gray-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                       class="pct-input w-20 rounded border border-slate-300 bg-white px-2 py-1 text-right text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                        data-form-key="{{ i.form_key }}"
                                        placeholder="%">
                             </td>
@@ -161,9 +155,15 @@
                                        name="price_{{ i.form_key }}"
                                        value="{{ i.item_promotion_price or '' }}"
                                        min="0" step="1"
-                                       class="price-input w-32 border border-gray-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                       class="price-input w-32 rounded border border-slate-300 bg-white px-2 py-1 text-right text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                        data-form-key="{{ i.form_key }}"
                                        placeholder="Price">
+                                <div class="price-helper mt-1 text-right text-[11px] text-slate-400 dark:text-slate-500"
+                                     data-form-key="{{ i.form_key }}">
+                                    {% if i.item_promotion_price is not none %}
+                                        {{ i.item_promotion_price | idr }}
+                                    {% endif %}
+                                </div>
                             </td>
                             <!-- Purchase Limit -->
                             <td class="px-4 py-3 text-right">
@@ -171,13 +171,13 @@
                                        name="limit_{{ i.form_key }}"
                                        value="{{ i.purchase_limit or '' }}"
                                        min="0" step="1"
-                                       class="w-24 border border-gray-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                       class="w-24 rounded border border-slate-300 bg-white px-2 py-1 text-right text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-orange-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                        placeholder="No limit">
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-400">No items found.</td>
+                            <td colspan="7" class="px-4 py-8 text-center text-slate-400 dark:text-slate-500">No items found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -188,7 +188,7 @@
         <!-- Submit -->
         <div class="flex justify-end mt-4">
             <a href="/discounts"
-               class="mr-3 px-5 py-2 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+               class="mr-3 rounded border border-slate-300 px-5 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
                 Cancel
             </a>
             <button type="submit"
@@ -211,6 +211,19 @@
         return isNaN(orig) ? null : orig;
     }
 
+    function formatCurrency(value) {
+        if (value === null || value === undefined || value === '') return '';
+        var number = Math.round(Number(value));
+        if (!Number.isFinite(number)) return '';
+        return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    function updatePriceHelper(fk, value) {
+        var helper = document.querySelector('.price-helper[data-form-key="' + fk + '"]');
+        if (!helper) return;
+        helper.textContent = formatCurrency(value);
+    }
+
     document.querySelectorAll('.pct-input').forEach(function (pctEl) {
         pctEl.addEventListener('input', function () {
             var fk = this.getAttribute('data-form-key');
@@ -220,17 +233,24 @@
             if (isNaN(pct)) return;
             var price = Math.round(orig * (1 - pct / 100));
             var priceEl = document.querySelector('.price-input[data-form-key="' + fk + '"]');
-            if (priceEl) priceEl.value = price;
+            if (priceEl) {
+                priceEl.value = price;
+                updatePriceHelper(fk, price);
+            }
         });
     });
 
     document.querySelectorAll('.price-input').forEach(function (priceEl) {
+        updatePriceHelper(priceEl.getAttribute('data-form-key'), priceEl.value);
+
         priceEl.addEventListener('input', function () {
             var fk = this.getAttribute('data-form-key');
             var orig = getOriginalPrice(fk);
-            if (orig === null || orig === 0) return;
             var price = parseFloat(this.value);
-            if (isNaN(price)) return;
+
+            updatePriceHelper(fk, this.value);
+
+            if (orig === null || orig === 0 || isNaN(price)) return;
             var pct = Math.round((1 - price / orig) * 100);
             var pctEl = document.querySelector('.pct-input[data-form-key="' + fk + '"]');
             if (pctEl) pctEl.value = pct;
