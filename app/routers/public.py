@@ -71,6 +71,7 @@ async def linked_products_page(request: Request, session: AsyncSession = Depends
         "per_page": result["per_page"],
         "total_pages": result["total_pages"],
         "jenis_bahan": jenis_bahan,
+        "jenis_bahan_options": await product_service.list_catalog_materials(session),
         "family_code": family_code,
         "variants": ", ".join(variants),
         "min_stock": min_stock,

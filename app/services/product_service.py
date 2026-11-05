@@ -173,6 +173,22 @@ def _matches_variant_filters(products: list[Product], variants: list[str], min_s
     return len(matched_variants) == len(variants)
 
 
+async def list_catalog_materials(session: AsyncSession) -> list[str]:
+    """List normalized materials from all catalog families, independent of filters/pages."""
+    result = await session.scalars(
+        select(Product.jenis_bahan).distinct().where(
+            Product.family_code.isnot(None), Product.family_code != "",
+            Product.jenis_bahan.isnot(None), Product.jenis_bahan != "",
+        )
+    )
+    materials = {
+        normalized.upper()
+        for value in result
+        if (normalized := normalize_jenis_bahan(value))
+    }
+    return sorted(materials)
+
+
 async def list_linked_product_families(
     session: AsyncSession,
     jenis_bahan: str | None = None,
