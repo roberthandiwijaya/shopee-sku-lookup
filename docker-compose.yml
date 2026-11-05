@@ -1,44 +1,33 @@
 services:
   postgres:
     image: postgres:16
-    container_name: shopee-pg
+    container_name: shopee-sandbox-pg
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: shopee_products
-    ports:
-      - "54558:5432"
+      POSTGRES_DB: shopee_sandbox
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - sandbox_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
-    depends_on:
-      - postgres
-
   app:
     build: .
-    container_name: shopee-app
+    container_name: shopee-sandbox-app
+    restart: unless-stopped
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_products
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_sandbox
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
-  pgdata:
+  sandbox_pgdata:
