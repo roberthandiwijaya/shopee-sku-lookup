@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Bulk catalog editor{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div><a href="/" class="text-indigo-600 dark:text-indigo-400">Back to products</a>
+    <h1 class="text-2xl font-bold mt-3">Bulk family / material editor</h1>
+    <p class="mt-2">Local catalog metadata only. This never writes to Shopee. Preview up to 200 products before saving.</p></div>
+    {% if error %}<div role="alert" class="p-4 border border-red-400 rounded text-red-700 dark:text-red-300">{{ error }}</div>{% endif %}
+    {% if success %}<div role="status" class="p-4 border border-green-500 rounded">{{ success }}</div>{% endif %}
+    {% set submitted = submitted or {} %}
+    {% if rows %}
+    <section class="space-y-4">
+        <h2 class="text-xl font-semibold">Preview: {{ rows|length }} products</h2>
+        <p>Review all values. Blank values clear the field. Preview expires after 15 minutes; any changed or missing product cancels the entire save.</p>
+        <div class="overflow-x-auto"><table class="w-full text-sm text-left">
+            <thead><tr><th class="p-2">Product</th><th class="p-2">Family: before → after</th><th class="p-2">Material: before → after</th></tr></thead>
+            <tbody>{% for row in rows %}<tr class="border-t">
+                <td class="p-2">{{ row.item_id }}<br>{{ row.name }}</td>
+                <td class="p-2">{{ row.before.family_code or '—' }} → <strong>{{ row.after.family_code or '—' }}</strong></td>
+                <td class="p-2">{{ row.before.jenis_bahan or '—' }} → <strong>{{ row.after.jenis_bahan or '—' }}</strong></td>
+            </tr>{% endfor %}</tbody>
+        </table></div>
+        <form method="post" action="/products/bulk/apply" class="space-y-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="preview_token" value="{{ preview_token }}">
+            <label class="block"><input type="checkbox" name="confirm" value="yes" required> I reviewed these changes and want to apply all of them.</label>
+            <button class="px-4 py-2 rounded bg-indigo-600 text-white" type="submit">Apply preview</button>
+            <a href="/products/bulk" class="ml-3 underline">Cancel</a>
+        </form>
+    </section>
+    {% endif %}
+    <form method="post" action="/products/bulk/preview" class="space-y-5 border rounded p-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <h2 class="text-xl font-semibold">{% if rows %}Start a new preview{% else %}Choose products and changes{% endif %}</h2>
+        <p>Use Shopee item IDs (not database IDs or variant IDs). Choose either IDs with shared values, or paste CSV for per-product values.</p>
+        <div><label for="item_ids" class="block font-semibold">Item IDs — comma, space or newline separated</label>
+        <textarea id="item_ids" name="item_ids" rows="3" maxlength="5000" class="w-full p-2 border rounded bg-white dark:bg-gray-800">{{ submitted.get('item_ids', '') }}</textarea></div>
+        {% for field, label, limit in [('family_code', 'Family code', 100), ('jenis_bahan', 'Material (jenis bahan)', 255)] %}
+        <div><label class="block"><input type="checkbox" name="edit_{{ field }}" value="yes" {% if submitted.get('edit_' ~ field) == 'yes' %}checked{% endif %}> Update {{ label }} for the IDs above</label>
+        <label for="{{ field }}" class="sr-only">{{ label }}</label>
+        <input id="{{ field }}" name="{{ field }}" maxlength="{{ limit }}" value="{{ submitted.get(field, '') }}" class="w-full p-2 border rounded bg-white dark:bg-gray-800">
+        <p class="text-sm">Unchecked leaves this field unchanged; checked with an empty value clears it.</p></div>
+        {% endfor %}
+        <div><label for="csv_text" class="block font-semibold">Or paste CSV</label>
+        <p class="text-sm">Header: <code>item_id,family_code,jenis_bahan</code>. Omit a field's column to leave it unchanged. Empty cells clear values. Duplicate or unknown IDs reject the whole batch.</p>
+        <textarea id="csv_text" name="csv_text" rows="6" maxlength="100000" placeholder="item_id,family_code,jenis_bahan&#10;1001,MP-8002,Katun Jepang" class="w-full p-2 border rounded bg-white dark:bg-gray-800 font-mono">{{ submitted.get('csv_text', '') }}</textarea></div>
+        <button class="px-4 py-2 rounded bg-indigo-600 text-white" type="submit">Preview changes — no save yet</button>
+    </form>
+</div>
+{% endblock %}

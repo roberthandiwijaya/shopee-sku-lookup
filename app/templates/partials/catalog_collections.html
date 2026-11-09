@@ -1,0 +1,22 @@
+<section class="mt-4 rounded-lg border border-slate-200 p-4 dark:border-slate-700" aria-labelledby="collections-title">
+    <h3 id="collections-title" class="font-medium">Saved collections</h3>
+    {% if request.session.get('user_id') %}
+    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Private to your dashboard account. Save family codes and export options; prices and stock are always read again when exporting.</p>
+    <div class="mt-3 flex flex-wrap items-end gap-2">
+        <label class="min-w-0 text-sm">Collection
+            <select id="catalog-collection" class="block max-w-full rounded border bg-white p-2 dark:bg-slate-950"><option value="">New collection</option></select>
+        </label>
+        <label class="min-w-0 text-sm">Name
+            <input id="collection-name" maxlength="100" class="block max-w-full rounded border bg-white p-2 dark:bg-slate-950" placeholder="Reseller favorites">
+        </label>
+        <button type="button" id="collection-load" class="rounded border px-3 py-2 text-sm">Load</button>
+        <button type="button" id="collection-save" class="rounded border px-3 py-2 text-sm">Save as new</button>
+        <button type="button" id="collection-update" class="rounded border px-3 py-2 text-sm">Update selected</button>
+        <button type="button" id="collection-delete" class="rounded border px-3 py-2 text-sm">Delete selected</button>
+        <button type="button" id="collection-delete-confirm" hidden class="rounded border border-red-500 px-3 py-2 text-sm">Confirm deletion</button>
+    </div>
+    <p id="collection-status" role="status" class="mt-2 text-sm"></p>
+    {% else %}
+    <p class="mt-1 text-sm"><a href="/login" class="underline">Sign in</a> to save reusable collections. Public browsing and PDF exports do not require an account.</p>
+    {% endif %}
+</section>

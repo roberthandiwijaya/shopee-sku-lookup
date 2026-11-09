@@ -206,6 +206,7 @@
                 <a href="/linked-products" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium {% if request.url.path.startswith('/linked-products') %}border-b-2 border-white dark:border-orange-300 pb-0.5{% endif %}">Linked Products</a>
                 {% if request.session.get("username") %}
                 <a href="/" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium {% if request.url.path == '/' %}border-b-2 border-white dark:border-orange-300 pb-0.5{% endif %}">Dashboard</a>
+                <a href="/products/bulk" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium">Bulk editing</a>
                 <a href="/discounts" class="text-orange-100 hover:text-white dark:text-slate-300 dark:hover:text-orange-300 text-sm font-medium {% if request.url.path.startswith('/discounts') %}border-b-2 border-white dark:border-orange-300 pb-0.5{% endif %}">Discounts</a>
                 {% endif %}
             </div>

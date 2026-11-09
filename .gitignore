@@ -9,3 +9,12 @@ build/
 .pytest_cache/
 test.db
 nul
+
+# Local deployment evidence and private operational data
+.deployments/
+.release-checks/
+backups/
+*.dump
+*.log
+.claude/worktrees/
+.codex

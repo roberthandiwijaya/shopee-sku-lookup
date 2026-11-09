@@ -156,6 +156,9 @@ All interactions use htmx for seamless partial updates without full page reloads
 | POST | `/discounts/{id}/edit` | Session | Submit discount edits |
 | POST | `/discounts/{id}/delete` | Session | Delete discount |
 | GET | `/api/products?sku=...` | `X-API-Key` | SKU lookup (single, multiple, or comma-separated) |
+| GET | `/api/orders/by-tracking-number?tracking_number=...` | `X-API-Key` | Look up synchronized package and item details by courier tracking number |
+| GET | `/api/v2/order/get_order_detail?order_sn_list=...` | `X-API-Key` | Temporary Shopee order-detail proxy (deprecated) |
+| GET | `/api/v2/order/get_package_detail?package_number_list=...` | `X-API-Key` | Temporary Shopee package-detail proxy (deprecated) |
 | POST | `/api/sync` | `X-API-Key` | Trigger manual product sync |
 | GET | `/api/sync/status` | — | Check last sync time and counts |
 | GET | `/api/auth/login` | — | Get Shopee OAuth URL |
@@ -186,6 +189,66 @@ All interactions use htmx for seamless partial updates without full page reloads
 }
 ```
 
+### Tracking Number Lookup
+
+Order and package data is synchronized locally so callers can look up a shipment
+using only its courier tracking number:
+
+```bash
+curl -G 'http://localhost:8000/api/orders/by-tracking-number' \
+  -H 'X-API-Key: your-api-key' \
+  --data-urlencode 'tracking_number=YOUR-TRACKING-NUMBER'
+```
+
+The response contains the Shopee order and package identifiers, carrier, and
+purchase-time item details. During the initial 90-day backfill, an unknown
+tracking number returns HTTP 503 rather than a false 404. After backfill,
+unknown tracking numbers return HTTP 404.
+
+Operators can run or resume the backfill with:
+
+```bash
+python -m app.tasks.order_backfill --days 90
+```
+
+The Shopee-shaped proxies remain temporarily during cutover and will be removed
+after the synchronized tracking index has been validated.
+
+### Order and Package Detail Proxies (Deprecated)
+
+Fetch an order by its Shopee `order_sn` and request its package information:
+
+```bash
+curl -G 'http://localhost:8000/api/v2/order/get_order_detail' \
+  -H 'X-API-Key: your-api-key' \
+  --data-urlencode 'order_sn_list=ORDER-1,ORDER-2' \
+  --data-urlencode 'response_optional_fields=package_list,item_list'
+```
+
+Both `order_sn_list` and `response_optional_fields` may also be repeated query
+parameters. Use an actual `order_sn`, not a logistics `booking_sn` or tracking
+number. The returned `package_list` can contain the `package_number` needed by
+the package-detail endpoint.
+
+Callers can then fetch Shopee package details through the configured shop using
+the same `X-API-Key` authentication:
+
+```bash
+curl -G 'http://localhost:8000/api/v2/order/get_package_detail' \
+  -H 'X-API-Key: your-api-key' \
+  --data-urlencode 'package_number_list=PKG-1,PKG-2'
+```
+
+The query parameter can also be repeated:
+
+```text
+?package_number_list=PKG-1&package_number_list=PKG-2
+```
+
+The app signs the request with its configured Shopee credentials and forwards
+it to `SHOPEE_BASE_URL`. The decoded Shopee JSON response is returned unchanged,
+including Shopee error payloads.
+
 ## 🧪 Running Tests
 
 ```bash
@@ -206,7 +269,11 @@ Tests use SQLite (no PostgreSQL required).
 | `SHOPEE_BASE_URL` | Shopee API base URL | `https://partner.shopeemobile.com` |
 | `SHOPEE_REDIRECT_URL` | OAuth callback URL | `http://localhost:8000/api/auth/callback` |
 | `SESSION_SECRET_KEY` | Secret key for session cookies | `change-me-in-production` |
-| `SYNC_INTERVAL_MINUTES` | Auto-sync interval | `60` |
+| `SYNC_INTERVAL_MINUTES` | Product auto-sync interval | `60` |
+| `ORDER_SYNC_ENABLED` | Enable order tracking synchronization | `true` |
+| `ORDER_SYNC_INTERVAL_MINUTES` | Incremental order-sync interval | `5` |
+| `ORDER_SYNC_BACKFILL_DAYS` | Initial tracking history window | `90` |
+| `ORDER_SYNC_OVERLAP_MINUTES` | Incremental update overlap | `30` |
 
 ## 🛠️ Local Development (without Docker)
 

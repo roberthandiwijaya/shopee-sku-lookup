@@ -41,8 +41,8 @@ async def test_sync_status_counts_all_seeded_products(client, seed_products):
     resp = await client.get("/api/sync/status")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["total_products"] == 4
-    assert data["total_models"] == 2
+    assert data["total_products"] == 8
+    assert data["total_models"] == 6
 
 
 @pytest.mark.asyncio
@@ -77,8 +77,8 @@ async def test_sync_status(client, seed_products):
     resp = await client.get("/api/sync/status")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["total_products"] == 4
-    assert data["total_models"] == 2
+    assert data["total_products"] == 8
+    assert data["total_models"] == 6
     assert data["token_status"] in ("healthy", "expiring_soon", "expired", "missing")
 
 
