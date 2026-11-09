@@ -1,0 +1,25 @@
+name: Isolated release checks
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run the same local release gate
+        run: python3 scripts/release_check.py
+      - name: Retain evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-check-evidence
+          path: .release-checks/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

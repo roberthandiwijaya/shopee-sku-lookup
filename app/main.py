@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
-from app.routers import auth, dashboard, discounts, login, products, public, webhook
+from app.routers import auth, bulk_products, catalog_tools, dashboard, discounts, login, orders, products, public, webhook
 from app.services.dashboard_auth import LoginRequired
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
@@ -38,9 +38,12 @@ async def login_required_handler(request: Request, exc: LoginRequired):
 
 
 app.include_router(login.router)
+app.include_router(bulk_products.router)
+app.include_router(catalog_tools.router)
 app.include_router(public.router)
 app.include_router(dashboard.router)
 app.include_router(products.router)
 app.include_router(discounts.router)
+app.include_router(orders.router)
 app.include_router(auth.router)
 app.include_router(webhook.router)

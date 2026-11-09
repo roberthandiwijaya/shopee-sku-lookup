@@ -1,0 +1,235 @@
+<script>
+(() => {
+    const byId = id => document.getElementById(id);
+    const form = byId('catalog-export-form'), codesInput = byId('export-family-codes');
+    const boxes = [...document.querySelectorAll('.catalog-family-select')];
+    const status = byId('export-status'), button = byId('export-pdf-button');
+    const mode = byId('export-stock-mode'), minimum = byId('export-min-stock');
+    const cancel = byId('export-cancel'), downloads = byId('export-downloads');
+    const storageKey = 'catalog-pdf-selection-v1', jobKey = 'catalog-pdf-active-job-v1';
+    let selected = new Set(), job = null, timer;
+    let approvedSelection = null, missingFamilies = [], preflightBusy = false;
+    const preflightResults = byId('preflight-results');
+    function selectionOptions() {
+        return {family_codes:[...selected],stock_mode:mode.value,
+            min_stock:mode.value === 'all' ? 1 : Number(minimum.value),
+            show_stock:byId('export-show-stock').checked,show_prices:byId('export-show-prices').checked,
+            output_mode:byId('export-output-mode').value};
+    }
+    function invalidatePreflight() {
+        approvedSelection = null;
+        button.textContent = 'Generate PDF';
+        preflightResults.hidden = true;
+        byId('preflight-remove-missing').hidden = true;
+    }
+    form.addEventListener('input', invalidatePreflight);
+    form.addEventListener('change', invalidatePreflight);
+    try {
+        const saved = JSON.parse(sessionStorage.getItem(storageKey) || '[]');
+        if (Array.isArray(saved)) selected = new Set(saved.filter(code => typeof code === 'string'));
+        const active = JSON.parse(sessionStorage.getItem(jobKey) || 'null');
+        if (active && /^[a-f0-9]{32}$/.test(active.id) && typeof active.token === 'string') job = active;
+    } catch (_) {}
+    function saveJob() { try { sessionStorage.setItem(jobKey, JSON.stringify(job)); } catch (_) {} }
+    const normalize = value => value.trim().toUpperCase().replace(/\s+/g, ' ');
+    function refresh(rewrite = true) {
+        invalidatePreflight();
+        boxes.forEach(box => { box.checked = selected.has(box.value); });
+        if (rewrite) codesInput.value = [...selected].join('\n');
+        byId('selection-count').textContent = `${selected.size} families selected`;
+        try { sessionStorage.setItem(storageKey, JSON.stringify([...selected])); } catch (_) {}
+    }
+    boxes.forEach(box => box.addEventListener('change', () => {
+        if (box.checked) selected.add(box.value); else selected.delete(box.value);
+        refresh();
+    }));
+    codesInput.addEventListener('input', () => {
+        selected = new Set(codesInput.value.split(/\r?\n/).map(normalize).filter(Boolean)); refresh(false);
+    });
+    byId('select-page').addEventListener('click', () => { boxes.forEach(box => selected.add(box.value)); refresh(); });
+    byId('clear-selection').addEventListener('click', () => { selected.clear(); refresh(); });
+    mode.addEventListener('change', () => { minimum.disabled = mode.value === 'all'; });
+    async function checked(response) {
+        if (response.ok) return response;
+        const error = await response.json().catch(() => ({}));
+        const message = typeof error.detail === 'string' ? error.detail : 'Export request failed. Please try again.';
+        const exception = new Error(message); exception.code = response.status; throw exception;
+    }
+    async function checkSelection() {
+        if (preflightBusy) return;
+        if (!selected.size || selected.size > 250) { status.textContent = 'Select between 1 and 250 families.'; return; }
+        preflightBusy = true; byId('export-preflight').disabled = true;
+        approvedSelection = null;
+        const options = selectionOptions(), signature = JSON.stringify(options);
+        status.textContent = 'Checking selection…';
+        try {
+            const response = await checked(await fetch('/linked-products/exports/preflight', {
+                method:'POST', headers:{'Content-Type':'application/json'}, body:signature}));
+            const result = await response.json();
+            if (JSON.stringify(selectionOptions()) !== signature) { status.textContent = 'Selection changed. Check it again.'; return; }
+            preflightResults.replaceChildren(); preflightResults.hidden = false;
+            const summary = document.createElement('p');
+            summary.textContent = `${result.included_families} families, ${result.matching_rows} matching rows.`;
+            preflightResults.appendChild(summary);
+            for (const message of [...result.errors, ...result.warnings]) {
+                const item = document.createElement('p'); item.textContent = message; preflightResults.appendChild(item);
+            }
+            const details = document.createElement('details'), title = document.createElement('summary');
+            title.textContent = 'Family-by-family result'; details.appendChild(title);
+            for (const family of result.families) {
+                const row = document.createElement('p');
+                row.textContent = `${family.family_code}: ${family.status} (${family.matching_rows}/${family.rows} rows)`;
+                details.appendChild(row);
+            }
+            preflightResults.appendChild(details);
+            missingFamilies = result.missing;
+            byId('preflight-remove-missing').hidden = !missingFamilies.length;
+            if (result.can_export) {
+                approvedSelection = signature; button.textContent = 'Confirm and generate PDF';
+                status.textContent = 'Review the preflight result, then confirm generation.';
+            } else { button.textContent = 'Generate PDF'; status.textContent = 'Resolve the selection errors and check again.'; }
+        } catch (error) { status.textContent = error.message; }
+        finally { preflightBusy = false; byId('export-preflight').disabled = false; }
+    }
+    byId('export-preflight').addEventListener('click', checkSelection);
+    byId('preflight-remove-missing').addEventListener('click', () => {
+        missingFamilies.forEach(code => selected.delete(code)); refresh();
+        status.textContent = 'Missing families removed. Check the remaining selection.';
+    });
+    function headers() { return {'Authorization': `Bearer ${job.token}`}; }
+    async function poll() {
+        if (!job) return;
+        try {
+            const response = await checked(await fetch(`/linked-products/exports/${job.id}`, {headers: headers()}));
+            const state = await response.json();
+            const active = ['pending','running'].includes(state.status);
+            button.disabled = active; cancel.hidden = !active;
+            if (active) {
+                status.textContent = state.status === 'pending' ? 'Queued. You may browse catalog pages while waiting.' : `Preparing catalog: ${state.progress} / ${state.total} families…`;
+                timer = setTimeout(poll, 2500); return;
+            }
+            downloads.replaceChildren();
+            if (state.status === 'ready') {
+                status.textContent = `Catalog ready. Downloads expire ${new Date(state.expires_at).toLocaleString()}.` +
+                    (state.omitted ? ` ${state.omitted} families omitted by the stock filter.` : '') +
+                    (state.warnings.length ? ` ${state.warnings.length} photo warnings: ${state.warnings.join(' ')}` : '');
+                const readyJob = {...job};
+                state.files.forEach(file => {
+                    const download = document.createElement('button');
+                    download.type = 'button'; download.className = 'rounded-lg border px-3 py-2 text-sm';
+                    download.textContent = `Download ${file.name} (${(file.size / 1048576).toFixed(1)} MB)`;
+                    download.addEventListener('click', () => {
+                        // Hand the response directly to the browser's download manager.
+                        // A POST body avoids putting the access token in URLs/history/logs.
+                        const nativeForm = document.createElement('form');
+                        nativeForm.method = 'POST';
+                        nativeForm.action = `/linked-products/exports/${readyJob.id}/files/${encodeURIComponent(file.name)}/download`;
+                        nativeForm.target = '_blank';
+                        nativeForm.rel = 'noopener noreferrer';
+                        nativeForm.hidden = true;
+                        const token = document.createElement('input');
+                        token.type = 'hidden'; token.name = 'token'; token.value = readyJob.token;
+                        nativeForm.appendChild(token);
+                        document.body.appendChild(nativeForm);
+                        nativeForm.submit();
+                        nativeForm.remove();
+                        status.textContent = 'Download requested. Check your browser downloads or the newly opened tab. If it does not start, allow downloads/pop-ups for this site and try again.';
+                    });
+                    downloads.appendChild(download);
+                });
+            } else {
+                status.textContent = state.error || `Export ${state.status}. You can generate a new catalog.`;
+                job = null; saveJob();
+            }
+        } catch (error) {
+            status.textContent = error.message;
+            if ([404,410].includes(error.code)) { job = null; saveJob(); button.disabled = false; cancel.hidden = true; }
+            else { timer = setTimeout(poll, 5000); }
+        }
+    }
+    cancel.addEventListener('click', async () => {
+        if (!job) return;
+        try {
+            await checked(await fetch(`/linked-products/exports/${job.id}/cancel`, {method:'POST',headers:headers()}));
+            clearTimeout(timer); await poll();
+        } catch (error) { status.textContent = error.message; }
+    });
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!selected.size || selected.size > 250) { status.textContent = 'Select between 1 and 250 families.'; return; }
+        if (approvedSelection !== JSON.stringify(selectionOptions())) { await checkSelection(); return; }
+        button.disabled = true; downloads.replaceChildren(); clearTimeout(timer);
+        status.textContent = 'Submitting export…';
+        try {
+            const response = await checked(await fetch('/linked-products/exports', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({family_codes:[...selected],stock_mode:mode.value,
+                    min_stock: mode.value === 'all' ? 1 : Number(minimum.value),
+                    show_stock:byId('export-show-stock').checked,show_prices:byId('export-show-prices').checked,
+                    output_mode:byId('export-output-mode').value})
+            }));
+            const result = await response.json(); job = {id:result.id,token:result.token}; saveJob(); await poll();
+        } catch (error) { status.textContent = error.message; button.disabled = false; }
+    });
+    const collectionSelect = byId('catalog-collection');
+    if (collectionSelect) {
+        let collections = [], csrf = '';
+        const collectionStatus = byId('collection-status'), name = byId('collection-name');
+        async function loadCollections(selectedId = '') {
+            const response = await checked(await fetch('/linked-products/collections'));
+            const data = await response.json(); collections = data.collections; csrf = data.csrf_token;
+            collectionSelect.replaceChildren(new Option('New collection', ''));
+            collections.forEach(collection => collectionSelect.add(new Option(collection.name, collection.id)));
+            collectionSelect.value = selectedId;
+        }
+        collectionSelect.addEventListener('change', () => {
+            const collection = collections.find(item => item.id === collectionSelect.value);
+            name.value = collection ? collection.name : '';
+            byId('collection-delete-confirm').hidden = true;
+        });
+        byId('collection-load').addEventListener('click', () => {
+            const collection = collections.find(item => item.id === collectionSelect.value);
+            if (!collection) { collectionStatus.textContent = 'Choose a saved collection first.'; return; }
+            const options = collection.options; selected = new Set(options.family_codes);
+            mode.value = options.stock_mode; minimum.value = options.min_stock; minimum.disabled = mode.value === 'all';
+            byId('export-show-stock').checked = options.show_stock;
+            byId('export-show-prices').checked = options.show_prices;
+            byId('export-output-mode').value = options.output_mode;
+            name.value = collection.name; refresh();
+            collectionStatus.textContent = 'Collection loaded. Check the selection for current availability.';
+        });
+        async function saveCollection(update) {
+            const id = collectionSelect.value;
+            if (update && !id) { collectionStatus.textContent = 'Choose a collection to update.'; return; }
+            if (!name.value.trim() || !selected.size || selected.size > 250) {
+                collectionStatus.textContent = 'Enter a name and select 1–250 families.'; return;
+            }
+            try {
+                const response = await checked(await fetch('/linked-products/collections' + (update ? '/' + id : ''), {
+                    method:update ? 'PUT' : 'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},
+                    body:JSON.stringify({...selectionOptions(),name:name.value})}));
+                const saved = await response.json(); await loadCollections(saved.id);
+                collectionStatus.textContent = 'Collection saved to your account.';
+            } catch (error) { collectionStatus.textContent = error.message; }
+        }
+        byId('collection-save').addEventListener('click', () => saveCollection(false));
+        byId('collection-update').addEventListener('click', () => saveCollection(true));
+        byId('collection-delete').addEventListener('click', () => {
+            if (!collectionSelect.value) { collectionStatus.textContent = 'Choose a collection to delete.'; return; }
+            byId('collection-delete-confirm').hidden = false;
+            collectionStatus.textContent = 'Confirm to permanently delete this saved collection. Products are not affected.';
+        });
+        byId('collection-delete-confirm').addEventListener('click', async () => {
+            if (!collectionSelect.value) return;
+            try {
+                await checked(await fetch('/linked-products/collections/' + collectionSelect.value,
+                    {method:'DELETE',headers:{'X-CSRF-Token':csrf}}));
+                await loadCollections(); name.value = ''; byId('collection-delete-confirm').hidden = true;
+                collectionStatus.textContent = 'Collection deleted. Current selection was kept.';
+            } catch (error) { collectionStatus.textContent = error.message; }
+        });
+        loadCollections().catch(error => { collectionStatus.textContent = error.message; });
+    }
+    refresh(); if (job) { button.disabled = true; poll(); }
+})();
+</script>

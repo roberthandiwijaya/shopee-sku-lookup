@@ -1,14 +1,14 @@
 services:
   postgres:
     image: postgres:16
-    container_name: shopee-sandbox-pg
+    container_name: shopee-pg
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: shopee_sandbox
+      POSTGRES_DB: shopee_products
     volumes:
-      - sandbox_pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -17,17 +17,62 @@ services:
 
   app:
     build: .
-    container_name: shopee-sandbox-app
+    container_name: shopee-app
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_sandbox
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_products
+    volumes:
+      - catalog_exports:/exports
     ports:
-      - "8001:8000"
+      - "8000:8000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.shopee.rule=Host(`shopee.techly.id`)
+      - traefik.http.routers.shopee.entrypoints=websecure
+      - traefik.http.routers.shopee.tls.certresolver=letsencrypt
+      - traefik.http.services.shopee.loadbalancer.server.port=8000
+      - traefik.docker.network=traefik
+    networks:
+      - default
+      - traefik
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  order-worker:
+    build: .
+    container_name: shopee-order-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_products
+    command: ["python", "-m", "app.tasks.order_refresh_worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  catalog-export-worker:
+    build: .
+    container_name: shopee-catalog-export-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_products
+    command: ["python", "-m", "app.tasks.catalog_export_worker"]
+    volumes:
+      - catalog_exports:/exports
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
-  sandbox_pgdata:
+  catalog_exports:
+  pgdata:
+
+networks:
+  traefik:
+    external: true

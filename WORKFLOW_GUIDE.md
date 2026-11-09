@@ -105,7 +105,7 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_sandbox
 
 # Shopee API - SANDBOX CREDENTIALS
 SHOPEE_PARTNER_ID=1175052
-SHOPEE_PARTNER_KEY=shpk6c576c416563574e68726b757a6278624f647151476e4946446e4a6e5153
+SHOPEE_PARTNER_KEY=your_sandbox_partner_key_here
 SHOPEE_SHOP_ID=225553049
 SHOPEE_BASE_URL=https://openplatform.sandbox.test-stable.shopee.sg
 

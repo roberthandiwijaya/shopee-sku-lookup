@@ -15,13 +15,13 @@ async def test_list_products_matches_family_code(seed_products):
 
 
 @pytest.mark.asyncio
-async def test_list_linked_product_families_groups_multi_product_families(seed_products):
+async def test_list_linked_product_families_includes_single_and_multi_product_families(seed_products):
     async with TestSession() as session:
         result = await product_service.list_linked_product_families(session)
 
     family_cards = result["family_cards"]
-    assert result["total"] == 3
-    assert [card["family_code"] for card in family_cards] == ["BC-1001", "MP-8002", "VR-JE9002"]
+    assert result["total"] == 4
+    assert [card["family_code"] for card in family_cards] == ["BC-1001", "MP-8002", "VR-JE9002", "ZZ-9001"]
     assert {product.item_id for product in next(card for card in family_cards if card["family_code"] == "MP-8002")["products"]} == {1001, 1002}
     assert {product.item_id for product in next(card for card in family_cards if card["family_code"] == "VR-JE9002")["products"]} == {1007, 1008}
 
@@ -70,10 +70,10 @@ async def test_list_linked_product_families_paginates_final_family_cards(seed_pr
         page_one = await product_service.list_linked_product_families(session, page=1, per_page=2)
         page_two = await product_service.list_linked_product_families(session, page=2, per_page=2)
 
-    assert page_one["total"] == 3
+    assert page_one["total"] == 4
     assert page_one["total_pages"] == 2
     assert [card["family_code"] for card in page_one["family_cards"]] == ["BC-1001", "MP-8002"]
-    assert [card["family_code"] for card in page_two["family_cards"]] == ["VR-JE9002"]
+    assert [card["family_code"] for card in page_two["family_cards"]] == ["VR-JE9002", "ZZ-9001"]
 
 
 @pytest.mark.asyncio
@@ -97,7 +97,7 @@ async def test_list_linked_product_families_clamps_page_to_last_page(seed_produc
         result = await product_service.list_linked_product_families(session, page=99, per_page=2)
 
     assert result["page"] == 2
-    assert [card["family_code"] for card in result["family_cards"]] == ["VR-JE9002"]
+    assert [card["family_code"] for card in result["family_cards"]] == ["VR-JE9002", "ZZ-9001"]
 
 
 @pytest.mark.asyncio

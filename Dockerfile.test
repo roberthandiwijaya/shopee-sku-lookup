@@ -1,0 +1,7 @@
+FROM python:3.13-slim
+WORKDIR /src
+ENV PYTHONPATH=/src PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "-m", "pytest", "tests", "-v", "-p", "scripts.release_check_pytest", "--junitxml=/results/sqlite.xml"]
