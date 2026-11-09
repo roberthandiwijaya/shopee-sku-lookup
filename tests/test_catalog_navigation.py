@@ -85,6 +85,7 @@ async def test_worker_navigation_in_final_volumes_and_zip(monkeypatch, tmp_path,
     monkeypatch.setattr(pdf, 'fetch_catalog_images', AsyncMock(return_value={}))
     worker = worker_module.CatalogExportWorker()
     worker.update = AsyncMock()
+    worker.check_cancellation = AsyncMock()  # layout test uses a synthetic job, not a durable queue row
     monkeypatch.setattr(worker, 'check_disk', lambda: None)
     directory = tmp_path / 'job'
     directory.mkdir()

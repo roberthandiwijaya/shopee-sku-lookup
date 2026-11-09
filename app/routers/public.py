@@ -1,9 +1,7 @@
-import asyncio
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
-from starlette.concurrency import run_in_threadpool
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -13,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.services import catalog_pdf_service, catalog_export_service as export_jobs, product_service
 from app.config import settings
+from app.services import catalog_identity
 
 router = APIRouter(tags=["public"])
 
@@ -21,7 +20,6 @@ templates.env.filters["idr"] = lambda value: "-" if value is None else f"{float(
 
 LINKED_PRODUCTS_PER_PAGE = 10
 ALLOWED_LINKED_PRODUCTS_PER_PAGE = {10, 20, 50}
-_export_gate = asyncio.Lock()
 
 
 class CatalogExportRequest(BaseModel):
@@ -37,18 +35,23 @@ class BackgroundExportRequest(CatalogExportRequest):
     output_mode: Literal["single", "split"] = "single"
 
 
+@router.get("/linked-products/export-session")
+async def export_session(request: Request, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    return {"csrf_token": catalog_identity.bootstrap(request)}
+
+
 @router.post("/linked-products/exports", status_code=202)
 async def create_catalog_export(payload: BackgroundExportRequest, request: Request, response: Response,
                                 session: AsyncSession = Depends(get_session)):
-    owner = request.session.get("catalog_export_owner")
-    if not owner:
-        import secrets
-        owner = secrets.token_hex(16)
-        request.session["catalog_export_owner"] = owner
+    owner = catalog_identity.require_export_session(request)
+    network = catalog_identity.network_hash(request)
     try:
-        job, token = await export_jobs.create_job(session, payload.model_dump(), export_jobs.digest(owner))
+        job, token = await export_jobs.create_job(session, payload.model_dump(), owner, network)
+    except export_jobs.RateLimited as exc:
+        return catalog_identity.limited_response(exc)
     except export_jobs.QueueFull as exc:
-        raise HTTPException(429, str(exc), headers={"Retry-After": "30"}) from exc
+        raise HTTPException(429, str(exc), headers={"Retry-After": "30", "Cache-Control": "no-store"}) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
@@ -77,7 +80,8 @@ async def catalog_export_status(job_id: str, request: Request, response: Respons
     response.headers["Cache-Control"] = "no-store"
     return {"id": job.id, "status": job.status, "progress": job.progress, "total": job.total,
             "error": job.error, "warnings": job.warnings or [], "expires_at": job.expires_at,
-            "snapshot_at": job.snapshot_at, "files": (job.result or {}).get("files", []),
+            "snapshot_at": job.snapshot_at, "cancel_requested": job.cancel_requested,
+            "files": (job.result or {}).get("files", []),
             "omitted": (job.result or {}).get("omitted", 0)}
 
 
@@ -87,7 +91,7 @@ async def cancel_catalog_export(job_id: str, request: Request, response: Respons
     job = await _get_export_job(request, session, job_id)
     await export_jobs.cancel_job(session, job)
     response.headers["Cache-Control"] = "no-store"
-    return {"status": "cancelled" if job.status in {"pending", "running", "cancelled"} else job.status}
+    return {"status": job.status, "cancel_requested": job.cancel_requested}
 
 
 @router.get("/linked-products/exports/{job_id}/files/{filename}")
@@ -120,32 +124,15 @@ def _catalog_export_file(job, filename):
 
 
 @router.post("/linked-products/export.pdf")
-async def export_catalog_pdf(payload: CatalogExportRequest, session: AsyncSession = Depends(get_session)):
-    # Same public data as the catalog. Bound work to one export per app process.
-    if _export_gate.locked():
-        raise HTTPException(429, "Another catalog export is running. Please try again shortly.", headers={"Retry-After": "10"})
-    async with _export_gate:
-        try:
-            cards, omitted = await catalog_pdf_service.get_export_cards(
-                session, payload.family_codes, stock_mode=payload.stock_mode, min_stock=payload.min_stock,
-            )
-        except ValueError as exc:
-            raise HTTPException(422, str(exc)) from exc
-        images = await catalog_pdf_service.fetch_catalog_images(cards)
-        pdf = await run_in_threadpool(
-            catalog_pdf_service.render_catalog_pdf, cards, images=images,
-            show_stock=payload.show_stock, show_prices=payload.show_prices, stock_mode=payload.stock_mode,
-            min_stock=payload.min_stock, omitted=omitted,
-        )
-    return Response(pdf, media_type="application/pdf", headers={
-        "Content-Disposition": 'attachment; filename="product-catalog.pdf"',
-        "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
-        "X-Catalog-Omitted-Families": str(omitted),
-    })
+async def export_catalog_pdf():
+    # Intentionally no body validation, database dependency, image or renderer work.
+    raise HTTPException(410, "Direct PDF generation is retired. Use /linked-products/exports and its status/download endpoints.",
+                        headers={"Cache-Control": "no-store"})
 
 
 @router.get("/linked-products", response_class=HTMLResponse)
 async def linked_products_page(request: Request, session: AsyncSession = Depends(get_session)):
+    catalog_identity.bootstrap(request)
     jenis_bahan = request.query_params.get("jenis_bahan", "")
     family_code = request.query_params.get("family_code", "")
     variants = request.query_params.getlist("variants")
@@ -204,4 +191,4 @@ async def linked_products_page(request: Request, session: AsyncSession = Depends
         "min_stock": min_stock,
         "per_page": per_page,
         "filter_error": filter_error,
-    })
+    }, headers={"Cache-Control": "no-store"})

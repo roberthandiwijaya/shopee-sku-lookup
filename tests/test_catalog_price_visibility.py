@@ -91,13 +91,18 @@ async def test_old_job_without_option_keeps_prices(client, seed_products, job_en
 
 
 @pytest.mark.asyncio
-async def test_sync_export_can_hide_prices_and_defaults_to_shown(client, seed_products, monkeypatch):
-    monkeypatch.setattr(pdf, 'fetch_catalog_images', AsyncMock(return_value={}))
+async def test_queued_export_can_hide_prices_and_defaults_to_shown(client, seed_products, monkeypatch, job_environment):
+    # This tests rendering options rather than elapsed-time policy (covered separately).
+    monkeypatch.setattr(settings, 'catalog_export_cooldown_seconds', 0)
     for option in [None, False]:
         payload = {'family_codes':['ZZ-9001']}
         if option is not None:
             payload['show_prices'] = option
-        response = await client.post('/linked-products/export.pdf',json=payload)
+        response = await client.post('/linked-products/exports',json=payload)
+        assert response.status_code == 202, response.text
+        job = response.json()
+        await worker_module.CatalogExportWorker().run_once()
+        response = await client.post(f"/linked-products/exports/{job['id']}/files/catalog.pdf/download",data={'token':job['token']})
         assert response.status_code == 200
         assert ('Rp175.000' in text_of(response.content)) is (option is None)
 

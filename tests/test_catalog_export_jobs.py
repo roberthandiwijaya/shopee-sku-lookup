@@ -132,7 +132,6 @@ async def test_reclaim_fences_old_worker(client, seed_products):
 @pytest.mark.asyncio
 async def test_queue_per_owner_limit(client, seed_products):
     await create(client)
-    await create(client)
     response = await client.post('/linked-products/exports', json={'family_codes':['ZZ-9001']})
     assert response.status_code == 429
 

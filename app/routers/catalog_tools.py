@@ -9,6 +9,7 @@ from app.models.product import DashboardUser
 from app.schemas.catalog import CatalogSelection, CollectionInput
 from app.services import catalog_collection_service as collections
 from app.services.catalog_preflight_service import preflight
+from app.services import catalog_identity, catalog_admission_service, catalog_export_service
 
 router = APIRouter(prefix="/linked-products", tags=["catalog tools"])
 
@@ -37,8 +38,14 @@ def verify_collection_csrf(request: Request):
 
 
 @router.post("/exports/preflight")
-async def export_preflight(payload: CatalogSelection, response: Response,
+async def export_preflight(payload: CatalogSelection, request: Request, response: Response,
                            session: AsyncSession = Depends(get_session)):
+    owner = catalog_identity.require_export_session(request)
+    network = catalog_identity.network_hash(request)
+    try:
+        await catalog_admission_service.check_preflight(session, owner, network)
+    except catalog_export_service.RateLimited as exc:
+        return catalog_identity.limited_response(exc)
     response.headers["Cache-Control"] = "no-store"
     return await preflight(session, payload)
 

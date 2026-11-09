@@ -26,7 +26,7 @@ services:
     volumes:
       - catalog_exports:/exports
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     labels:
       - traefik.enable=true
       - traefik.http.routers.shopee.rule=Host(`shopee.techly.id`)

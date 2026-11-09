@@ -8,12 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import settings
 from app.database import get_session
-from app.main import app
 from app.models.product import Base, DashboardUser, Product, ProductModel
 from app.services.dashboard_auth import hash_password
 
 TEST_API_KEY = "test-api-key-for-testing"
 settings.api_key = TEST_API_KEY
+settings.session_cookie_secure = False
+settings.catalog_export_allowed_origins = ["http://test"]
+settings.catalog_export_network_secret = "test-only-export-network-secret-32-bytes"
+from app.main import app  # configure test cookie policy before middleware construction
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
@@ -41,7 +44,9 @@ app.dependency_overrides[get_session] = _override_get_session
 @pytest_asyncio.fixture
 async def client():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(transport=transport, base_url="http://test", headers={"Origin": "http://test"}) as c:
+        session = await c.get('/linked-products/export-session')
+        c.headers['X-Export-CSRF'] = session.json()['csrf_token']
         yield c
 
 

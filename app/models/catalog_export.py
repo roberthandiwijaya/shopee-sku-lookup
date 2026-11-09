@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.product import Base, JsonType, TZ_GMT7
@@ -8,10 +8,18 @@ from app.models.product import Base, JsonType, TZ_GMT7
 
 class CatalogExportJob(Base):
     __tablename__ = "catalog_export_jobs"
+    __table_args__ = (
+        Index("ix_catalog_export_jobs_owner_created", "owner_hash", "created_at"),
+        Index("ix_catalog_export_jobs_network_created", "network_hash", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     owner_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    network_hash: Mapped[str | None] = mapped_column(String(64))
+    # Admission cost is never changed by worker filtering/progress updates.
+    requested_family_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
     options: Mapped[dict] = mapped_column(JsonType, nullable=False)
     status: Mapped[str] = mapped_column(String(16), index=True, default="pending")
     progress: Mapped[int] = mapped_column(Integer, default=0)

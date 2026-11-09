@@ -19,6 +19,18 @@ Errors, incomplete/duplicate responses, ambiguous empty model lists and unknown 
 
 Limitations: an upstream item that cannot be confirmed remains stale and requires investigation; identical but silently incomplete upstream lists cannot be independently proven complete. Variant confirmation adds API requests. The legacy sync-status timestamp is still the newest per-product timestamp, not a durable full-run success record. Do not use it alone as proof that every record refreshed.
 
+## Public PDF admission protection
+
+Guest exports stay available through the background queue only. `/linked-products/export.pdf` is retired with HTTP 410; it no longer validates bodies, fetches images or renders PDFs. API clients first GET `/linked-products/export-session` with cookies enabled, then submit `X-Export-CSRF` and an allowed Origin/Referer on preflight and job creation. Missing prior sessions are not admitted. Existing capability-protected status, cancel and download routes retain their authorization contract.
+
+Default configurable limits: one active export/session; 30-second acceptance cooldown; five accepted exports and 500 requested families/session/hour; 20 accepted exports and 2,000 requested families/client network/hour; global queue limit ten. Family charges use normalized selected codes, not worker-filtered results. Accepted failed/cancelled jobs count; rejected requests and worker retries do not create charges. HTTP 429 includes `Retry-After`, `reason` and `retry_after`; capacity retries are advisory. Preflight has separate fixed-minute limits (10/session, 60/network). PostgreSQL serializes admission across processes.
+
+Migration `015` adds immutable quota metadata and bounded preflight buckets. Network linkage is HMAC-hashed (IPv4 /32, IPv6 /64), cleared after 24 hours independently of file expiry; no raw addresses are stored in quota state. Network limiting needs a dedicated shared `CATALOG_EXPORT_NETWORK_SECRET` of at least 32 characters. Without it, preflight/creation fail closed with 503; browsing and existing downloads remain available. Set `CATALOG_EXPORT_ALLOWED_ORIGINS` to a JSON array of exact permitted origins. Cookies are HTTPS-only by default (`SESSION_COOKIE_SECURE=false` only for deliberate local HTTP development).
+
+**Deployment prerequisite, not performed automatically:** Uvicorn starts with `--no-proxy-headers`; configure `CATALOG_EXPORT_TRUSTED_PROXY_IPS` as a JSON array of exact stable Traefik peers, verify Traefik sanitizes forwarding headers, and restrict direct application-port access to the intended management interface. Never trust `*` or an entire shared Docker subnet. Untrusted forwarding headers are ignored. Untrusted private proxy/gateway peers fail closed with 503 rather than collapsing all visitors into a falsely verified shared bucket. Shared Traefik/firewall/port changes require separate approval. No production proxy or secret changes are included in this source update.
+
+A dedicated renderer lock and delayed terminal cancellation keep the slot occupied until render-thread/cleanup work drains. Keep one worker replica initially. Python threads cannot be forcibly killed by the job deadline; a lost database connection can release the lock while a thread survives. This is bounded accidental/simple-abuse protection, not DDoS protection or a promise that resource exhaustion is impossible.
+
 ## Tech Stack
 
 - **Python 3.11+** / **FastAPI**

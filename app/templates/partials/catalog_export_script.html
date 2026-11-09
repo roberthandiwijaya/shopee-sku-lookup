@@ -9,7 +9,43 @@
     const storageKey = 'catalog-pdf-selection-v1', jobKey = 'catalog-pdf-active-job-v1';
     let selected = new Set(), job = null, timer;
     let approvedSelection = null, missingFamilies = [], preflightBusy = false;
-    const preflightResults = byId('preflight-results');
+    let submitting = false, activeJob = false, cancelBusy = false, cancelRequested = false;
+    let sessionPromise = null, cooldownTimer;
+    const cooldowns = {generation: {until: 0, message: ''}, preflight: {until: 0, message: ''}};
+    const preflightResults = byId('preflight-results'), preflightButton = byId('export-preflight');
+    function remaining(kind) { return Math.max(0, Math.ceil((cooldowns[kind].until - Date.now()) / 1000)); }
+    function updateControls() {
+        const needsCheck = approvedSelection !== JSON.stringify(selectionOptions());
+        button.disabled = activeJob || submitting || preflightBusy || remaining('generation') > 0 || (needsCheck && remaining('preflight') > 0);
+        preflightButton.disabled = preflightBusy || submitting || remaining('preflight') > 0;
+        cancel.hidden = !activeJob;
+        cancel.disabled = cancelBusy || cancelRequested;
+        cancel.textContent = cancelRequested ? 'Cancelling…' : 'Cancel export';
+        const messages = [];
+        for (const [kind, label] of [['generation', 'Generation'], ['preflight', 'Selection check']]) {
+            const seconds = remaining(kind);
+            if (seconds) messages.push(`${label}: ${cooldowns[kind].message} Try again in ${seconds}s.`);
+        }
+        byId('export-cooldown').textContent = messages.join(' ');
+        clearTimeout(cooldownTimer);
+        if (messages.length) cooldownTimer = setTimeout(updateControls, 1000);
+    }
+    function applyCooldown(error, kind) {
+        if (error.code !== 429) return;
+        cooldowns[kind] = {until: Date.now() + error.retryAfter * 1000, message: error.message};
+        updateControls();
+    }
+    async function exportSession() {
+        if (!sessionPromise) {
+            sessionPromise = (async () => {
+                const response = await checked(await fetch('/linked-products/export-session', {credentials: 'same-origin'}));
+                const data = await response.json();
+                if (typeof data.csrf_token !== 'string' || !data.csrf_token) throw new Error('Could not initialize export session. Please try again.');
+                return data.csrf_token;
+            })().catch(error => { sessionPromise = null; throw error; });
+        }
+        return sessionPromise;
+    }
     function selectionOptions() {
         return {family_codes:[...selected],stock_mode:mode.value,
             min_stock:mode.value === 'all' ? 1 : Number(minimum.value),
@@ -21,6 +57,7 @@
         button.textContent = 'Generate PDF';
         preflightResults.hidden = true;
         byId('preflight-remove-missing').hidden = true;
+        updateControls();
     }
     form.addEventListener('input', invalidatePreflight);
     form.addEventListener('change', invalidatePreflight);
@@ -53,18 +90,25 @@
         if (response.ok) return response;
         const error = await response.json().catch(() => ({}));
         const message = typeof error.detail === 'string' ? error.detail : 'Export request failed. Please try again.';
-        const exception = new Error(message); exception.code = response.status; throw exception;
+        const exception = new Error(message);
+        exception.code = response.status;
+        exception.reason = typeof error.reason === 'string' ? error.reason : '';
+        const retryAfter = Number(response.headers.get('Retry-After') || error.retry_after);
+        exception.retryAfter = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : 60;
+        throw exception;
     }
     async function checkSelection() {
-        if (preflightBusy) return;
+        if (preflightBusy || submitting || remaining('preflight')) return;
         if (!selected.size || selected.size > 250) { status.textContent = 'Select between 1 and 250 families.'; return; }
-        preflightBusy = true; byId('export-preflight').disabled = true;
-        approvedSelection = null;
+        preflightBusy = true;
+        approvedSelection = null; updateControls();
         const options = selectionOptions(), signature = JSON.stringify(options);
         status.textContent = 'Checking selection…';
         try {
+            const csrfToken = await exportSession();
             const response = await checked(await fetch('/linked-products/exports/preflight', {
-                method:'POST', headers:{'Content-Type':'application/json'}, body:signature}));
+                method:'POST', credentials:'same-origin',
+                headers:{'Content-Type':'application/json','X-Export-CSRF':csrfToken}, body:signature}));
             const result = await response.json();
             if (JSON.stringify(selectionOptions()) !== signature) { status.textContent = 'Selection changed. Check it again.'; return; }
             preflightResults.replaceChildren(); preflightResults.hidden = false;
@@ -88,8 +132,12 @@
                 approvedSelection = signature; button.textContent = 'Confirm and generate PDF';
                 status.textContent = 'Review the preflight result, then confirm generation.';
             } else { button.textContent = 'Generate PDF'; status.textContent = 'Resolve the selection errors and check again.'; }
-        } catch (error) { status.textContent = error.message; }
-        finally { preflightBusy = false; byId('export-preflight').disabled = false; }
+        } catch (error) {
+            applyCooldown(error, 'preflight');
+            if (error.code === 403) sessionPromise = null;
+            status.textContent = error.message;
+        }
+        finally { preflightBusy = false; updateControls(); }
     }
     byId('export-preflight').addEventListener('click', checkSelection);
     byId('preflight-remove-missing').addEventListener('click', () => {
@@ -102,10 +150,12 @@
         try {
             const response = await checked(await fetch(`/linked-products/exports/${job.id}`, {headers: headers()}));
             const state = await response.json();
-            const active = ['pending','running'].includes(state.status);
-            button.disabled = active; cancel.hidden = !active;
-            if (active) {
-                status.textContent = state.status === 'pending' ? 'Queued. You may browse catalog pages while waiting.' : `Preparing catalog: ${state.progress} / ${state.total} families…`;
+            activeJob = ['pending','running'].includes(state.status);
+            cancelRequested = activeJob && (cancelRequested || state.cancel_requested === true);
+            updateControls();
+            if (activeJob) {
+                status.textContent = cancelRequested ? 'Cancelling export. Waiting for processing to stop…' :
+                    state.status === 'pending' ? 'Queued. You may browse catalog pages while waiting.' : `Preparing catalog: ${state.progress} / ${state.total} families…`;
                 timer = setTimeout(poll, 2500); return;
             }
             downloads.replaceChildren();
@@ -143,33 +193,51 @@
             }
         } catch (error) {
             status.textContent = error.message;
-            if ([404,410].includes(error.code)) { job = null; saveJob(); button.disabled = false; cancel.hidden = true; }
+            if ([404,410].includes(error.code)) {
+                job = null; activeJob = false; cancelRequested = false; saveJob(); updateControls();
+            }
             else { timer = setTimeout(poll, 5000); }
         }
     }
     cancel.addEventListener('click', async () => {
-        if (!job) return;
+        if (!job || !activeJob || cancelBusy || cancelRequested) return;
+        cancelBusy = true; updateControls();
         try {
-            await checked(await fetch(`/linked-products/exports/${job.id}/cancel`, {method:'POST',headers:headers()}));
+            const response = await checked(await fetch(`/linked-products/exports/${job.id}/cancel`, {method:'POST',headers:headers()}));
+            const result = await response.json();
+            if (result.cancel_requested) {
+                cancelRequested = true;
+                status.textContent = 'Cancelling export. Waiting for processing to stop…';
+            }
             clearTimeout(timer); await poll();
         } catch (error) { status.textContent = error.message; }
+        finally { cancelBusy = false; updateControls(); }
     });
     form.addEventListener('submit', async event => {
         event.preventDefault();
+        if (activeJob || submitting || preflightBusy || remaining('generation')) return;
         if (!selected.size || selected.size > 250) { status.textContent = 'Select between 1 and 250 families.'; return; }
-        if (approvedSelection !== JSON.stringify(selectionOptions())) { await checkSelection(); return; }
-        button.disabled = true; downloads.replaceChildren(); clearTimeout(timer);
+        const signature = JSON.stringify(selectionOptions());
+        if (approvedSelection !== signature) { await checkSelection(); return; }
+        submitting = true; updateControls();
         status.textContent = 'Submitting export…';
         try {
+            const csrfToken = await exportSession();
+            if (signature !== JSON.stringify(selectionOptions()) || approvedSelection !== signature) {
+                status.textContent = 'Selection changed. Check it again.'; return;
+            }
             const response = await checked(await fetch('/linked-products/exports', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({family_codes:[...selected],stock_mode:mode.value,
-                    min_stock: mode.value === 'all' ? 1 : Number(minimum.value),
-                    show_stock:byId('export-show-stock').checked,show_prices:byId('export-show-prices').checked,
-                    output_mode:byId('export-output-mode').value})
+                method:'POST', credentials:'same-origin',
+                headers:{'Content-Type':'application/json','X-Export-CSRF':csrfToken}, body:signature
             }));
-            const result = await response.json(); job = {id:result.id,token:result.token}; saveJob(); await poll();
-        } catch (error) { status.textContent = error.message; button.disabled = false; }
+            const result = await response.json();
+            job = {id:result.id,token:result.token}; activeJob = true; cancelRequested = false;
+            saveJob(); downloads.replaceChildren(); clearTimeout(timer); await poll();
+        } catch (error) {
+            applyCooldown(error, 'generation');
+            if (error.code === 403) sessionPromise = null;
+            status.textContent = error.message;
+        } finally { submitting = false; updateControls(); }
     });
     const collectionSelect = byId('catalog-collection');
     if (collectionSelect) {
@@ -230,6 +298,8 @@
         });
         loadCollections().catch(error => { collectionStatus.textContent = error.message; });
     }
-    refresh(); if (job) { button.disabled = true; poll(); }
+    activeJob = Boolean(job);
+    refresh();
+    if (job) poll();
 })();
 </script>
