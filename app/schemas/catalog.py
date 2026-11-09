@@ -8,7 +8,7 @@ class CatalogSelection(BaseModel):
     family_codes: list[str] = Field(min_length=1, max_length=250)
     stock_mode: Literal["all", "available"] = "available"
     min_stock: int = Field(default=1, ge=1, le=1_000_000)
-    show_stock: bool = True
+    show_stock: bool = False
     show_prices: bool = True
     output_mode: Literal["single", "split"] = "single"
 

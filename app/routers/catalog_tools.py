@@ -9,7 +9,7 @@ from app.models.product import DashboardUser
 from app.schemas.catalog import CatalogSelection, CollectionInput
 from app.services import catalog_collection_service as collections
 from app.services.catalog_preflight_service import preflight
-from app.services import catalog_identity, catalog_admission_service, catalog_export_service
+from app.services import catalog_identity, catalog_admission_service, catalog_export_service, catalog_stock_auth
 
 router = APIRouter(prefix="/linked-products", tags=["catalog tools"])
 
@@ -41,6 +41,7 @@ def verify_collection_csrf(request: Request):
 async def export_preflight(payload: CatalogSelection, request: Request, response: Response,
                            session: AsyncSession = Depends(get_session)):
     owner = catalog_identity.require_export_session(request)
+    await catalog_stock_auth.require_quantity_permission(request, session, payload.show_stock)
     network = catalog_identity.network_hash(request)
     try:
         await catalog_admission_service.check_preflight(session, owner, network)
@@ -58,9 +59,10 @@ async def list_saved(request: Request, response: Response, user_id: int = Depend
 
 
 @router.post("/collections", status_code=201, dependencies=[Depends(verify_collection_csrf)])
-async def create_saved(payload: CollectionInput, response: Response, user_id: int = Depends(collection_user),
+async def create_saved(payload: CollectionInput, request: Request, response: Response, user_id: int = Depends(collection_user),
                        session: AsyncSession = Depends(get_session)):
     response.headers["Cache-Control"] = "no-store"
+    await catalog_stock_auth.require_quantity_permission(request, session, payload.show_stock)
     try:
         return await collections.save_collection(session, user_id, payload)
     except ValueError as exc:
@@ -68,12 +70,13 @@ async def create_saved(payload: CollectionInput, response: Response, user_id: in
 
 
 @router.put("/collections/{collection_id}", dependencies=[Depends(verify_collection_csrf)])
-async def update_saved(collection_id: str, payload: CollectionInput, response: Response,
+async def update_saved(collection_id: str, payload: CollectionInput, request: Request, response: Response,
                        user_id: int = Depends(collection_user), session: AsyncSession = Depends(get_session)):
     response.headers["Cache-Control"] = "no-store"
     collection = await collections.owned_collection(session, user_id, collection_id)
     if collection is None:
         raise HTTPException(404, "Collection not found.")
+    await catalog_stock_auth.require_quantity_permission(request, session, payload.show_stock)
     try:
         return await collections.save_collection(session, user_id, payload, collection)
     except ValueError as exc:

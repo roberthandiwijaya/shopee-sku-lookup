@@ -90,7 +90,8 @@
                 <label class="block text-sm">Minimum stock
                     <input id="export-min-stock" type="number" min="1" max="1000000" value="1" required class="mt-1 block w-28 rounded-lg border bg-white p-2 dark:border-slate-700 dark:bg-slate-950">
                 </label>
-                <label class="flex items-center gap-2 py-2 text-sm"><input id="export-show-stock" type="checkbox" checked> Show exact stock quantities</label>
+                <label class="flex items-center gap-2 py-2 text-sm"><input id="export-show-stock" type="checkbox" data-can-export-quantities="{{ 'true' if can_export_quantities else 'false' }}" {% if not can_export_quantities %}disabled{% endif %}> Tampilkan jumlah stok (pcs) — admin saja</label>
+                {% if not can_export_quantities %}<p class="text-xs text-slate-500 dark:text-slate-400"><a href="/login" class="underline">Masuk sebagai admin</a> untuk mengekspor jumlah stok dalam pcs.</p>{% endif %}
                 <label class="flex items-center gap-2 py-2 text-sm"><input id="export-show-prices" type="checkbox" checked> Include prices</label>
                 <label class="block text-sm">Output
                     <select id="export-output-mode" class="mt-1 block rounded-lg border bg-white p-2 dark:border-slate-700 dark:bg-slate-950">
@@ -100,14 +101,21 @@
                 <button id="export-pdf-button" type="submit" class="rounded-lg bg-orange-500 px-4 py-2 font-medium text-white disabled:opacity-50">Generate PDF</button>
                 <button id="export-cancel" type="button" hidden class="rounded-lg border px-4 py-2">Cancel export</button>
             </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Export uses the selected codes, not just the current page. Stock filters apply to individual variants; families with no matching stock are omitted. Uncheck quantities to show availability labels instead.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Export uses the selected codes, not just the current page. Stock filters apply to individual variants; families with no matching stock are omitted. PDF pelanggan menampilkan status stok, bukan jumlah pcs. Pilih “All, including out of stock” untuk menyertakan Stok Habis.</p>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm" aria-label="Keterangan status stok">
+                <span class="font-medium text-red-700 dark:text-red-300">Stok Habis (0)</span>
+                <span class="font-medium text-red-700 dark:text-red-300">Stok Terbatas (1–2)</span>
+                <span class="font-medium text-orange-700 dark:text-orange-300">Stok Tersedia (3–5)</span>
+                <span class="font-medium text-green-700 dark:text-green-300">Stok Banyak (6+)</span>
+            </div>
+            <p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">Stok dapat berubah sewaktu-waktu. Mohon konfirmasi ketersediaan stok sebelum memesan.</p>
             <div class="flex flex-wrap gap-3">
                 <button type="button" id="export-preflight" class="rounded-lg border px-3 py-2 text-sm">Check selection</button>
                 <button type="button" id="preflight-remove-missing" hidden class="rounded-lg border px-3 py-2 text-sm">Remove missing families</button>
             </div>
             <div id="preflight-results" hidden class="rounded-lg border p-3 text-sm" aria-live="polite"></div>
             <p class="text-xs text-slate-500 dark:text-slate-400">Generation checks your selection first. Review the result, then confirm. Stock may change before processing. Use your PDF reader’s bookmarks to jump between families.</p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">No login is required. Export limits apply to this browser session and shared service capacity. If a limit is reached, wait for the countdown before retrying; existing downloads and cancellation remain available. Selections and job recovery in this tab are best-effort and may be lost if browser storage is unavailable.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">No login is required for stock-label PDFs. Exact quantities require an admin account. Export limits apply to this browser session and shared service capacity. If a limit is reached, wait for the countdown before retrying; existing downloads and cancellation remain available. Selections and job recovery in this tab are best-effort and may be lost if browser storage is unavailable.</p>
             <p id="export-cooldown" class="text-sm text-amber-700 dark:text-amber-300" role="status" aria-live="polite"></p>
             <p id="export-status" class="text-sm" role="status" aria-live="polite"></p>
             <div id="export-downloads" class="flex flex-wrap gap-3"></div>

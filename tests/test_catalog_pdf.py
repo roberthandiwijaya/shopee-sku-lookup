@@ -45,7 +45,8 @@ async def test_export_is_public_and_selected_only(client, seed_products):
     assert response.headers["cache-control"] == "no-store"
     reader, text = read_pdf(response.content)
     assert len(reader.pages) == 1
-    assert "ZZ-9001" in text and "Solo Product" in text and "8 pcs" in text
+    assert "ZZ-9001" in text and "Solo Product" in text and "Stok Banyak" in text
+    assert "8 pcs" not in text
     assert "MP-8002" not in text
     assert "WIB" in text
 
@@ -70,7 +71,7 @@ async def test_export_all_stock_with_quantities_hidden(client, seed_products):
     })
     assert response.status_code == 200
     _, text = read_pdf(response.content)
-    assert "180x200" in text and "Out of stock" in text and "Available" in text
+    assert "180x200" in text and "Stok Habis" in text and "Stok Terbatas" in text and "Stok Tersedia" in text
     assert " pcs" not in text
 
 
@@ -82,7 +83,7 @@ async def test_export_omits_empty_family_with_notice(client, seed_products):
     response = await queued_pdf(client,{"family_codes": ["ZZ-9001", "MP-8002"]})
     assert response.status_code == 200
     _, text = read_pdf(response.content)
-    assert "1 selected families omitted" in text
+    assert "Sebagian kelompok produk tidak disertakan" in text
 
 
 @pytest.mark.asyncio

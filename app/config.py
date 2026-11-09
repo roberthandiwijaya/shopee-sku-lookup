@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     catalog_export_trusted_proxy_ips: list[str] = []
     catalog_export_allowed_origins: list[str] = ["https://shopee.techly.id"]
     session_cookie_secure: bool = True
+    catalog_export_admin_usernames: list[str] = ["admin"]
 
     model_config = {"env_file": str(ENV_FILE), "env_file_encoding": "utf-8"}
 

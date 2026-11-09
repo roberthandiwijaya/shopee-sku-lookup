@@ -29,7 +29,7 @@ def test_price_visibility_on_all_pages(show_stock, show_prices):
     assert len(reader.pages) > 1
     text = '\n'.join(page.extract_text() for page in reader.pages)
     assert 'Variant 084' in text
-    assert ('4 pcs' if show_stock else 'Available') in text
+    assert ('4 pcs' if show_stock else 'Stok Tersedia') in text
     for page in reader.pages:
         page_text = page.extract_text()
         if show_prices:
@@ -71,7 +71,7 @@ async def test_background_price_free_catalog(client, seed_products, job_environm
             texts = [text_of(response.content)]
         for text in texts:
             assert 'PRICE' not in text and 'Rp175.000' not in text
-            assert '8 pcs' in text and 'Solo Product' in text
+            assert 'Stok Banyak' in text and '8 pcs' not in text and 'Solo Product' in text
 
 
 @pytest.mark.asyncio
