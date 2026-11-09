@@ -11,6 +11,7 @@ import app.models.order  # noqa: F401 — registers order tracking models with B
 import app.models.webhook  # noqa: F401 — registers durable webhook/refresh models
 import app.models.catalog_export  # noqa: F401
 import app.models.catalog_collection  # noqa: F401
+import app.models.catalog_rate_bucket  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

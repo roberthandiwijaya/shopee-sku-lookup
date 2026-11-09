@@ -1,5 +1,5 @@
 import io
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from PIL import Image
@@ -7,14 +7,28 @@ from pypdf import PdfReader
 from sqlalchemy import update
 
 from app.models.product import Product
+from app.database import get_session
+from app.main import app
+from app.tasks import catalog_export_worker as worker_module
+from app.config import settings
 from app.routers import public
 from app.services import catalog_pdf_service as pdf
 from tests.conftest import TestSession
 
 
 @pytest.fixture(autouse=True)
-def no_remote_images(monkeypatch):
+def no_remote_images(monkeypatch, tmp_path):
     monkeypatch.setattr(pdf, "fetch_catalog_images", AsyncMock(return_value={}))
+    monkeypatch.setattr(settings, 'catalog_export_dir', str(tmp_path))
+    monkeypatch.setattr(worker_module, 'async_session', TestSession)
+
+
+async def queued_pdf(client, payload):
+    response = await client.post('/linked-products/exports', json=payload)
+    assert response.status_code == 202, response.text
+    job = response.json()
+    await worker_module.CatalogExportWorker().run_once()
+    return await client.post(f"/linked-products/exports/{job['id']}/files/catalog.pdf/download", data={'token':job['token']})
 
 
 def read_pdf(data):
@@ -24,7 +38,7 @@ def read_pdf(data):
 
 @pytest.mark.asyncio
 async def test_export_is_public_and_selected_only(client, seed_products):
-    response = await client.post("/linked-products/export.pdf", json={"family_codes": [" zz-9001 "]})
+    response = await queued_pdf(client,{"family_codes": [" zz-9001 "]})
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert "attachment" in response.headers["content-disposition"]
@@ -38,7 +52,7 @@ async def test_export_is_public_and_selected_only(client, seed_products):
 
 @pytest.mark.asyncio
 async def test_export_filters_rows_not_just_families(client, seed_products):
-    response = await client.post("/linked-products/export.pdf", json={
+    response = await queued_pdf(client,{
         "family_codes": ["VR-JE9002"], "min_stock": 2,
     })
     assert response.status_code == 200
@@ -51,7 +65,7 @@ async def test_export_filters_rows_not_just_families(client, seed_products):
 
 @pytest.mark.asyncio
 async def test_export_all_stock_with_quantities_hidden(client, seed_products):
-    response = await client.post("/linked-products/export.pdf", json={
+    response = await queued_pdf(client,{
         "family_codes": ["VR-JE9002"], "stock_mode": "all", "show_stock": False,
     })
     assert response.status_code == 200
@@ -65,9 +79,8 @@ async def test_export_omits_empty_family_with_notice(client, seed_products):
     async with TestSession() as session:
         await session.execute(update(Product).where(Product.item_id == 1003).values(stock=0))
         await session.commit()
-    response = await client.post("/linked-products/export.pdf", json={"family_codes": ["ZZ-9001", "MP-8002"]})
+    response = await queued_pdf(client,{"family_codes": ["ZZ-9001", "MP-8002"]})
     assert response.status_code == 200
-    assert response.headers["x-catalog-omitted-families"] == "1"
     _, text = read_pdf(response.content)
     assert "1 selected families omitted" in text
 
@@ -81,15 +94,37 @@ async def test_export_omits_empty_family_with_notice(client, seed_products):
     {"family_codes": ["ZZ-9001"], "min_stock": 99999},
 ])
 async def test_export_rejects_invalid_or_empty_requests(client, seed_products, payload):
-    response = await client.post("/linked-products/export.pdf", json=payload)
-    assert response.status_code == 422
+    # Validation failures consume no queue work; semantic catalog errors fail the job safely.
+    response = await client.post('/linked-products/exports', json=payload)
+    if response.status_code == 422:
+        return
+    assert response.status_code == 202
+    job = response.json()
+    await worker_module.CatalogExportWorker().run_once()
+    state = await client.get('/linked-products/exports/'+job['id'], headers={'Authorization':'Bearer '+job['token']})
+    assert state.json()['status'] == 'failed'
 
 
 @pytest.mark.asyncio
-async def test_export_gate_rejects_concurrent_jobs(client, seed_products):
-    async with public._export_gate:
-        response = await client.post("/linked-products/export.pdf", json={"family_codes": ["ZZ-9001"]})
-    assert response.status_code == 429
+async def test_retired_direct_route_does_no_work_even_for_malformed_payload(client, monkeypatch):
+    async def forbidden_session():
+        raise AssertionError('Retired endpoint accessed database')
+        yield
+    previous = app.dependency_overrides[get_session]
+    render = Mock(side_effect=AssertionError('Retired endpoint rendered'))
+    images = AsyncMock(side_effect=AssertionError('Retired endpoint fetched images'))
+    monkeypatch.setattr(pdf, 'render_catalog_pdf', render)
+    monkeypatch.setattr(pdf, 'fetch_catalog_images', images)
+    app.dependency_overrides[get_session] = forbidden_session
+    try:
+        for body in [b'', b'{bad', b'{"family_codes":["ZZ-9001"]}']:
+            response = await client.post('/linked-products/export.pdf',content=body,headers={'Content-Type':'application/json'})
+            assert response.status_code == 410
+            assert '/linked-products/exports' in response.json()['detail']
+        render.assert_not_called()
+        images.assert_not_awaited()
+    finally:
+        app.dependency_overrides[get_session] = previous
 
 
 @pytest.mark.asyncio

@@ -40,6 +40,19 @@ class Settings(BaseSettings):
     catalog_export_job_seconds: int = 900
     catalog_export_retention_hours: int = 24
     catalog_export_queue_limit: int = 10
+    catalog_export_owner_active_limit: int = 1
+    catalog_export_cooldown_seconds: int = 30
+    catalog_export_owner_hourly_limit: int = 5
+    catalog_export_owner_family_hourly_limit: int = 500
+    catalog_export_network_hourly_limit: int = 20
+    catalog_export_network_family_hourly_limit: int = 2000
+    catalog_export_preflight_owner_per_minute: int = 10
+    catalog_export_preflight_network_per_minute: int = 60
+    # Explicit deployment settings: never infer trust from arbitrary forwarded headers.
+    catalog_export_network_secret: str = ""
+    catalog_export_trusted_proxy_ips: list[str] = []
+    catalog_export_allowed_origins: list[str] = ["https://shopee.techly.id"]
+    session_cookie_secure: bool = True
 
     model_config = {"env_file": str(ENV_FILE), "env_file_encoding": "utf-8"}
 

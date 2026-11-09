@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Run offline export controller regressions
+        run: node --test scripts/catalog_export_browser_regression.js
       - name: Run the same local release gate
         run: python3 scripts/release_check.py
       - name: Retain evidence even on failure
