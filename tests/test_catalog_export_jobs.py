@@ -151,7 +151,7 @@ async def test_limits_and_worker_failure(client, seed_products):
 async def test_fifty_one_families_make_two_volumes(client, seed_products):
     async with TestSession() as session:
         for i in range(51):
-            session.add(Product(shop_id=1,item_id=20000+i,item_name=f'Family {i}',family_code=f'B-{i:03}',stock=3,current_price=1000))
+            session.add(Product(shop_id=1,item_status='NORMAL',item_id=20000+i,item_name=f'Family {i}',family_code=f'B-{i:03}',stock=3,current_price=1000))
         await session.commit()
     id, headers = await create(client,[f'B-{i:03}' for i in range(51)],output_mode='split')
     await worker_module.CatalogExportWorker().run_once()
@@ -175,7 +175,7 @@ async def test_large_exports_complete_all_families(client, seed_products, monkey
     monkeypatch.setattr(pdf, 'fetch_catalog_images', photo)
     async with TestSession() as session:
         for i in range(count):
-            session.add(Product(shop_id=1,item_id=30000+i,item_name=f'Benchmark family {i}',
+            session.add(Product(shop_id=1,item_status='NORMAL',item_id=30000+i,item_name=f'Benchmark family {i}',
                 family_code=f'L-{i:03}',stock=3,current_price=1000,
                 images=['https://cf.shopee.co.id/test']))
         await session.commit()

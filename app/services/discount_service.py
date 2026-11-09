@@ -118,6 +118,7 @@ async def get_enriched_discount_items(
             ProductModel,
             and_(
                 ProductModel.model_id == DiscountItem.shopee_model_id,
+                ProductModel.is_active.is_(True),
                 DiscountItem.shopee_model_id != 0,
             ),
         )
@@ -133,7 +134,7 @@ async def get_enriched_discount_items(
     if item_ids_to_expand:
         res = await session.execute(
             select(ProductModel)
-            .where(ProductModel.item_id.in_(item_ids_to_expand))
+            .where(ProductModel.item_id.in_(item_ids_to_expand), ProductModel.is_active.is_(True))
             .order_by(ProductModel.item_id, ProductModel.model_name)
         )
         for pm in res.scalars():

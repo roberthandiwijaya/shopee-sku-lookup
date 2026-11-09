@@ -52,7 +52,7 @@ async def lookup_by_skus(
 
 async def get_sync_stats(session: AsyncSession) -> dict:
     product_count = await session.scalar(select(func.count(Product.id)))
-    model_count = await session.scalar(select(func.count(ProductModel.id)))
+    model_count = await session.scalar(select(func.count(ProductModel.id)).where(ProductModel.is_active.is_(True)))
     last_sync = await session.scalar(
         select(func.max(Product.synced_at))
     )
@@ -178,7 +178,7 @@ async def list_catalog_materials(session: AsyncSession) -> list[str]:
     result = await session.scalars(
         select(Product.jenis_bahan).distinct().where(
             Product.family_code.isnot(None), Product.family_code != "",
-            Product.jenis_bahan.isnot(None), Product.jenis_bahan != "",
+            Product.jenis_bahan.isnot(None), Product.jenis_bahan != "", Product.item_status == "NORMAL",
         )
     )
     materials = {
@@ -204,14 +204,14 @@ async def list_linked_product_families(
     requested_variants = _normalize_linked_product_variants(variants)
     per_page = max(1, per_page)
     families = select(Product.family_code).where(
-        Product.family_code.isnot(None), Product.family_code != ""
+        Product.family_code.isnot(None), Product.family_code != "", Product.item_status == "NORMAL"
     ).distinct()
     if normalized_family:
         families = families.where(Product.family_code == normalized_family)
     if normalized_material:
         material = await _normalized_sql(session, Product.jenis_bahan)
         families = families.where(Product.family_code.in_(
-            select(Product.family_code).where(material == normalized_material.upper())
+            select(Product.family_code).where(material == normalized_material.upper(), Product.item_status == "NORMAL")
         ))
     if requested_variants:
         model_name = await _normalized_sql(session, ProductModel.model_name, variant=True)
@@ -220,7 +220,7 @@ async def list_linked_product_families(
             families = families.where(Product.family_code.in_(
                 select(Product.family_code).join(Product.models).where(
                     model_name.contains(term, autoescape=True),
-                    ProductModel.stock >= max(min_stock, 1),
+                    ProductModel.stock >= max(min_stock, 1), Product.item_status == "NORMAL",
                 )
             ))
     total = await session.scalar(select(func.count()).select_from(families.subquery())) or 0
@@ -233,7 +233,7 @@ async def list_linked_product_families(
     if keys:
         products = await session.scalars(
             select(Product).options(selectinload(Product.models))
-            .where(Product.family_code.in_(keys))
+            .where(Product.family_code.in_(keys), Product.item_status == "NORMAL")
         )
         for product in products:
             grouped[product.family_code].append(product)
