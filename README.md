@@ -9,6 +9,16 @@ REST API + web dashboard that syncs products from Shopee Open API v2.0 to a loca
 - **🧪 Sandbox + Production** — Dual environment setup for safe development
 - **🚀 Easy Deploy Script** — One-command deployment to sandbox or production
 
+## Safe product reconciliation
+
+Product sync discovers `NORMAL`, `UNLIST` and `BANNED` listings and also checks all locally known shop item IDs. Inactive products stay in the operations/SKU database with their actual Shopee status; public catalogs and PDFs include only `NORMAL` products.
+
+Removed variants are archived (`product_models.is_active=false`), never automatically deleted. Two complete, validated matching Shopee model lists are required before archiving; a confirmed transition to a non-variant product likewise requires a second base response. Returned models reactivate automatically. Current variant relationships, filters, preflight and exports exclude archived models. Apply migration `014` before starting this version.
+
+Errors, incomplete/duplicate responses, ambiguous empty model lists and unknown warnings do not authorize archival or freshen affected records. A missing item is not assumed deleted: failed batches are retried individually so healthy items continue, and the run reports an incomplete result with affected item IDs in logs. Previously successful batches remain committed. A PostgreSQL advisory lock prevents overlapping product syncs. Family codes and materials are never overwritten by upstream sync.
+
+Limitations: an upstream item that cannot be confirmed remains stale and requires investigation; identical but silently incomplete upstream lists cannot be independently proven complete. Variant confirmation adds API requests. The legacy sync-status timestamp is still the newest per-product timestamp, not a durable full-run success record. Do not use it alone as proof that every record refreshed.
+
 ## Tech Stack
 
 - **Python 3.11+** / **FastAPI**
