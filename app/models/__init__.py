@@ -4,6 +4,7 @@ from app.models.order import Order, OrderPackage, OrderPackageItem, OrderSyncSta
 from app.models.webhook import OrderRefreshJob, ShopeeWebhookEvent
 from app.models.catalog_export import CatalogExportJob
 from app.models.catalog_collection import CatalogCollection
+from app.models.catalog_rate_bucket import CatalogRateBucket
 
 __all__ = [
     "Product",

@@ -107,6 +107,8 @@
             </div>
             <div id="preflight-results" hidden class="rounded-lg border p-3 text-sm" aria-live="polite"></div>
             <p class="text-xs text-slate-500 dark:text-slate-400">Generation checks your selection first. Review the result, then confirm. Stock may change before processing. Use your PDF reader’s bookmarks to jump between families.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">No login is required. Export limits apply to this browser session and shared service capacity. If a limit is reached, wait for the countdown before retrying; existing downloads and cancellation remain available. Selections and job recovery in this tab are best-effort and may be lost if browser storage is unavailable.</p>
+            <p id="export-cooldown" class="text-sm text-amber-700 dark:text-amber-300" role="status" aria-live="polite"></p>
             <p id="export-status" class="text-sm" role="status" aria-live="polite"></p>
             <div id="export-downloads" class="flex flex-wrap gap-3"></div>
         </form>

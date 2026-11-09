@@ -27,7 +27,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(SessionMiddleware, secret_key=settings.session_secret_key)
+app.add_middleware(SessionMiddleware, secret_key=settings.session_secret_key,
+                   https_only=settings.session_cookie_secure, same_site="lax")
 
 
 @app.exception_handler(LoginRequired)

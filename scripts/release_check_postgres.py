@@ -69,7 +69,7 @@ async def check_queues(engine):
     async with sessions() as session:
         session.add_all([CatalogExportJob(
             id=str(n) * 32, token_hash="0" * 64, owner_hash="1" * 64,
-            options={"family_codes": ["RELEASE"]}, status="pending", attempts=0,
+            options={"family_codes": ["RELEASE"]}, status="pending", attempts=0, requested_family_count=1,
             created_at=now + timedelta(seconds=n), expires_at=now + timedelta(hours=1),
         ) for n in (1, 2)])
         await session.commit()
@@ -168,6 +168,42 @@ async def check_sync_lock(engine):
     print('PASS: PostgreSQL product sync lock excludes concurrent runs and releases cleanly')
 
 
+async def check_export_admission(engine):
+    from unittest.mock import patch
+    from sqlalchemy import delete
+    from app.config import settings
+    from app.services import catalog_export_service as jobs
+    from app.tasks import catalog_export_worker as worker
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with sessions() as session:
+        await session.execute(delete(CatalogExportJob))
+        await session.commit()
+    async def attempt(owner, network):
+        async with sessions() as session:
+            try:
+                await jobs.create_job(session, {'family_codes':['CHECK-1']}, owner, network)
+                return True
+            except jobs.RateLimited:
+                await session.rollback()
+                return False
+    results = await asyncio.gather(*(attempt('same-owner', 'same-network') for _ in range(6)))
+    require(sum(results) == 1, 'Concurrent owner admission exceeded one active job')
+    async with sessions() as session:
+        await session.execute(delete(CatalogExportJob))
+        await session.commit()
+    with patch.object(settings, 'catalog_export_network_hourly_limit', 2):
+        results = await asyncio.gather(*(attempt(f'owner-{i}', 'shared-network') for i in range(6)))
+    require(sum(results) == 2, 'Concurrent network admission exceeded shared budget')
+    with patch.object(worker, 'async_session', sessions):
+        async with worker.renderer_occupancy() as first:
+            require(first, 'Could not acquire renderer lock')
+            async with worker.renderer_occupancy() as second:
+                require(not second, 'Second renderer acquired occupied lock')
+        async with worker.renderer_occupancy() as acquired:
+            require(acquired, 'Renderer lock was not released')
+    print('PASS: PostgreSQL atomic owner/network quotas and dedicated renderer occupancy')
+
+
 async def main():
     require(os.environ.get("DATABASE_URL") == EXPECTED_URL, "Refusing any non-release database URL")
     engine = create_async_engine(EXPECTED_URL, connect_args={"command_timeout": 10})
@@ -179,7 +215,19 @@ async def main():
         heads = ScriptDirectory.from_config(Config("alembic.ini")).get_heads()
         require(len(heads) == 1, "Expected exactly one migration head")
         # No shell pipelines, no swallowed migration exit codes.
-        for command in (["upgrade", "head"], ["upgrade", "head"], ["downgrade", "-1"], ["upgrade", "head"]):
+        for command in (["upgrade", "014"],):
+            subprocess.run(["alembic", *command], check=True)
+        # Seed the pre-015 schema to prove backfill uses requested codes, not mutable total.
+        async with engine.begin() as conn:
+            await conn.execute(text("""INSERT INTO catalog_export_jobs
+                (id, token_hash, owner_hash, options, status, progress, total, attempts, created_at, expires_at)
+                VALUES ('migration-check', 'hash', 'owner', CAST(:options AS json), 'ready', 0, 0, 0, now(), now()+interval '1 hour')"""),
+                {'options': '{"family_codes":["ONE","TWO"]}'})
+        subprocess.run(['alembic','upgrade','head'], check=True)
+        async with engine.connect() as conn:
+            count = await conn.scalar(text("SELECT requested_family_count FROM catalog_export_jobs WHERE id='migration-check'"))
+            require(count == 2, 'Migration did not backfill immutable requested family count')
+        for command in (["upgrade", "head"], ["downgrade", "-1"], ["upgrade", "head"]):
             subprocess.run(["alembic", *command], check=True)
         async with engine.connect() as conn:
             current = (await conn.execute(text("SELECT version_num FROM alembic_version"))).scalars().all()
@@ -189,6 +237,7 @@ async def main():
         await check_catalog_features(engine)
         await check_sync_lock(engine)
         await check_sync_reconciliation(engine)
+        await check_export_admission(engine)
         print('PASS: native PostgreSQL catalog filters, partner counts, preflight, collections and bulk editing', flush=True)
         print("PASS: fresh migrations, idempotence, one-step rollback/reapply, model columns, both real SKIP LOCKED claims and live leases", flush=True)
     finally:
