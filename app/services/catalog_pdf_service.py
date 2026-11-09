@@ -40,7 +40,7 @@ async def get_export_cards(session, family_codes, *, stock_mode="available", min
         raise ValueError("Invalid stock filter.")
     result = await session.execute(
         select(Product).options(selectinload(Product.models))
-        .where(Product.family_code.in_(codes))
+        .where(Product.family_code.in_(codes), Product.item_status == "NORMAL")
         .order_by(Product.family_code, Product.item_name, Product.item_id)
     )
     grouped = {}
@@ -54,6 +54,9 @@ async def get_export_cards(session, family_codes, *, stock_mode="available", min
         family = _build_family_card(code, grouped[code])
         products = []
         for product in family["products"]:
+            if product.has_model and not product.models:
+                # Never invent a standard SKU when every known variant is archived.
+                continue
             if product.models:
                 rows = [{"name": model.model_name or "-", "price": model.current_price, "stock": model.stock}
                         for model in sorted(product.models, key=lambda model: (model.model_name or "", model.model_id))]

@@ -1,7 +1,7 @@
 """Read-only export validation; no jobs, images, or Shopee calls."""
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import case, func, select
+from sqlalchemy import and_, or_, case, func, select
 
 from app.models.product import Product, ProductModel
 from app.schemas.catalog import CatalogSelection
@@ -9,19 +9,20 @@ from app.schemas.catalog import CatalogSelection
 
 async def preflight(session, options: CatalogSelection) -> dict:
     stock = case((ProductModel.id.is_not(None), ProductModel.stock), else_=Product.stock)
-    included = stock >= options.min_stock if options.stock_mode == "available" else True
+    valid_row = or_(ProductModel.id.is_not(None), Product.has_model.is_not(True))
+    included = and_(valid_row, stock >= options.min_stock) if options.stock_mode == "available" else valid_row
     query = (
         select(
             Product.family_code,
-            func.count().label("rows"),
+            func.sum(case((valid_row, 1), else_=0)).label("rows"),
             func.sum(case((included, 1), else_=0)).label("matching"),
             func.min(Product.synced_at).label("product_sync"),
             func.min(ProductModel.synced_at).label("model_sync"),
             func.sum(case((Product.synced_at.is_(None), 1), else_=0)).label("unknown_products"),
             func.sum(case((ProductModel.id.is_not(None) & ProductModel.synced_at.is_(None), 1), else_=0)).label("unknown_models"),
         )
-        .outerjoin(ProductModel, ProductModel.product_id == Product.id)
-        .where(Product.family_code.in_(options.family_codes))
+        .outerjoin(ProductModel, and_(ProductModel.product_id == Product.id, ProductModel.is_active.is_(True)))
+        .where(Product.family_code.in_(options.family_codes), Product.item_status == "NORMAL")
         .group_by(Product.family_code)
     )
     found = {row.family_code: row for row in (await session.execute(query)).all()}

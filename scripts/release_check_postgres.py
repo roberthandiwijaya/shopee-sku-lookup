@@ -92,9 +92,9 @@ async def check_catalog_features(engine):
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     async with sessions() as session:
         user = DashboardUser(username='release-check', password_hash='unused', salt='unused', must_change_password=False)
-        first = Product(shop_id=1, item_id=900001, item_name='First', item_sku='FIRST',
+        first = Product(shop_id=1, item_status='NORMAL', item_id=900001, item_name='First', item_sku='FIRST',
                         family_code='CHECK-1', jenis_bahan='  Katun\t Premium  ', stock=10)
-        second = Product(shop_id=1, item_id=900002, item_name='Second', item_sku='SECOND',
+        second = Product(shop_id=1, item_status='NORMAL', item_id=900002, item_name='Second', item_sku='SECOND',
                          family_code='CHECK-1', jenis_bahan='Other', stock=5)
         session.add_all([user, first, second])
         await session.flush()
@@ -122,6 +122,52 @@ async def check_catalog_features(engine):
         require(materials == ['Cotton', 'Cotton'], 'PostgreSQL bulk changes did not persist')
 
 
+async def check_sync_reconciliation(engine):
+    from unittest.mock import patch, AsyncMock
+    from app.models.product import Product, ProductModel
+    from app.services import sync_service, product_service
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with sessions() as session:
+        product = Product(shop_id=1, item_id=910001, item_name='Sync check', item_status='NORMAL',
+                          has_model=True, family_code='SYNC-CHECK', jenis_bahan='Keep material')
+        session.add(product)
+        await session.flush()
+        session.add_all([ProductModel(product_id=product.id, item_id=910001, model_id=910011, model_sku='RETAIN'),
+                         ProductModel(product_id=product.id, item_id=910001, model_id=910012, model_sku='ARCHIVE')])
+        await session.commit()
+    base = {'response': {'item_list': [{'item_id': 910001, 'has_model': True, 'item_status': 'UNLIST', 'item_name': 'Updated'}]}}
+    models = {'response': {'model': [{'model_id': 910011, 'model_sku': 'RETAIN',
+                'price_info': [{'original_price': 100, 'current_price': 90}],
+                'stock_info_v2': {'summary_info': {'total_available_stock': 2}}}]}}
+    with patch.object(sync_service, 'async_session', sessions), patch.object(sync_service.shopee_client, 'shop_request',
+            AsyncMock(side_effect=[base, models, models])):
+        await sync_service._sync_item_batch('test-only', 1, [910001])
+    async with sessions() as session:
+        product = await product_service.get_product_by_item_id(session, 910001)
+        require(product.item_status == 'UNLIST' and product.family_code == 'SYNC-CHECK' and product.jenis_bahan == 'Keep material',
+                'PostgreSQL sync lost metadata or status')
+        require([m.model_id for m in product.models] == [910011], 'PostgreSQL active relationship leaked archive')
+        archived = await session.scalar(select(ProductModel).where(ProductModel.model_id == 910012))
+        require(archived is not None and not archived.is_active, 'PostgreSQL archive deleted data or remained active')
+    print('PASS: PostgreSQL sync persistence, inactive status, metadata preservation and reversible archival')
+
+
+async def check_sync_lock(engine):
+    from unittest.mock import patch
+    from app.services import sync_service
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    with patch.object(sync_service, 'async_session', sessions):
+        async with sync_service._sync_lock(123):
+            try:
+                async with sync_service._sync_lock(123):
+                    raise AssertionError('Concurrent sync lock was acquired')
+            except RuntimeError as exc:
+                require('already running' in str(exc), 'Unexpected lock error')
+        async with sync_service._sync_lock(123):
+            pass
+    print('PASS: PostgreSQL product sync lock excludes concurrent runs and releases cleanly')
+
+
 async def main():
     require(os.environ.get("DATABASE_URL") == EXPECTED_URL, "Refusing any non-release database URL")
     engine = create_async_engine(EXPECTED_URL, connect_args={"command_timeout": 10})
@@ -141,6 +187,8 @@ async def main():
             await conn.run_sync(verify_schema)
         await check_queues(engine)
         await check_catalog_features(engine)
+        await check_sync_lock(engine)
+        await check_sync_reconciliation(engine)
         print('PASS: native PostgreSQL catalog filters, partner counts, preflight, collections and bulk editing', flush=True)
         print("PASS: fresh migrations, idempotence, one-step rollback/reapply, model columns, both real SKIP LOCKED claims and live leases", flush=True)
     finally:
