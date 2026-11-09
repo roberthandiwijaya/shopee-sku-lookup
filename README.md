@@ -9,6 +9,17 @@ REST API + web dashboard that syncs products from Shopee Open API v2.0 to a loca
 - **🧪 Sandbox + Production** — Dual environment setup for safe development
 - **🚀 Easy Deploy Script** — One-command deployment to sandbox or production
 
+## Catalog workflow additions
+
+- **Bulk editing:** sign in and open `/products/bulk` (Bulk editing in navigation). Paste up to 200 Shopee item IDs and shared values, or CSV with `item_id,family_code,jenis_bahan`. Omitted fields are unchanged; empty selected fields clear values. Review and confirm the signed preview within 15 minutes. Concurrent metadata changes reject the entire batch. This changes local metadata only, not Shopee. Undo/history is not included.
+- **SQL pagination:** dashboard product queries and public catalog family queries count/filter/page in the database before loading models. Partner counts describe the whole family, even when search matches only one sibling.
+- **Saved collections:** sign in, select families on `/linked-products`, name the collection and save. Collections belong to the dashboard account, persist across devices, and include stock/price/output preferences (up to 50 collections, 250 family codes each). Anyone sharing an account shares its collections. Public browsing/export remains login-free. Collections save codes/options, not frozen prices or reserved stock.
+- **Export preflight:** use Check selection or Generate PDF to review missing families, stock-filter exclusions, row counts and stale/unknown source freshness. Remove missing families without clearing valid selections, then confirm generation. Preflight is advisory; workers re-read data and may reject changed selections. The two-hour freshness warning is not a guarantee of stock accuracy.
+- **PDF navigation:** family bookmarks point to actual first pages, including long families and merged/split PDFs. Use a PDF viewer with outline support. Printed background-export page numbers remain family-local; no printed index is added.
+- **Release checks:** see [RELEASE_CHECKS.md](RELEASE_CHECKS.md). Run `python3 scripts/release_check.py --production-source /opt/shopee` for isolated Docker tests, disposable PostgreSQL migration/concurrency/catalog checks, source fingerprints and drift evidence. This does not deploy. CI runs on pull requests/manual dispatch once these files are committed and pushed; branch protection requires separate configuration.
+
+Migration `013` adds private saved collections. Apply it before serving the new catalog tools, using the reviewed release procedure. Keep production and sandbox credentials/configuration separate.
+
 ## Tech Stack
 
 - **Python 3.11+** / **FastAPI**
@@ -156,6 +167,9 @@ All interactions use htmx for seamless partial updates without full page reloads
 | POST | `/discounts/{id}/edit` | Session | Submit discount edits |
 | POST | `/discounts/{id}/delete` | Session | Delete discount |
 | GET | `/api/products?sku=...` | `X-API-Key` | SKU lookup (single, multiple, or comma-separated) |
+| GET | `/api/v2/order/get_order_detail?order_sn_list=...` | `X-API-Key` | Proxy Shopee order-detail lookup |
+| GET | `/api/orders/by-tracking-number?tracking_number=...` | `X-API-Key` | Look up synchronized package and item details by courier tracking number |
+| GET | `/api/v2/order/get_package_detail?package_number_list=...` | `X-API-Key` | Temporary Shopee package-detail proxy (deprecated) |
 | POST | `/api/sync` | `X-API-Key` | Trigger manual product sync |
 | GET | `/api/sync/status` | — | Check last sync time and counts |
 | GET | `/api/auth/login` | — | Get Shopee OAuth URL |
@@ -186,6 +200,67 @@ All interactions use htmx for seamless partial updates without full page reloads
 }
 ```
 
+### Tracking Number Lookup
+
+Order and package data is synchronized locally so callers can look up a shipment
+using only its courier tracking number:
+
+```bash
+curl -G 'http://localhost:8001/api/orders/by-tracking-number' \
+  -H 'X-API-Key: your-api-key' \
+  --data-urlencode 'tracking_number=YOUR-TRACKING-NUMBER'
+```
+
+The response contains the Shopee order and package identifiers, carrier, and
+purchase-time item details. During the initial 90-day backfill, an unknown
+tracking number returns HTTP 503 rather than a false 404. After backfill,
+unknown tracking numbers return HTTP 404.
+
+Operators can run or resume the backfill with:
+
+```bash
+python -m app.tasks.order_backfill --days 90
+```
+
+The Shopee-shaped proxies remain temporarily during cutover and will be removed
+after the synchronized tracking index has been validated.
+
+### Order and Package Detail Proxies (Deprecated)
+
+Fetch an order by its Shopee `order_sn` and request its package information:
+
+```bash
+curl -G 'http://localhost:8001/api/v2/order/get_order_detail' \
+  -H 'X-API-Key: your-api-key' \
+  --data-urlencode 'order_sn_list=ORDER-1,ORDER-2' \
+  --data-urlencode 'response_optional_fields=package_list,item_list'
+```
+
+Both `order_sn_list` and `response_optional_fields` may also be repeated query
+parameters. Use an actual `order_sn`, not a logistics `booking_sn` or tracking
+number. The returned `package_list` can contain the `package_number` needed by
+the package-detail endpoint.
+
+Callers can then fetch Shopee package details through the configured shop using
+the same `X-API-Key` authentication:
+
+```bash
+curl -G 'http://localhost:8001/api/v2/order/get_package_detail' \
+  -H 'X-API-Key: your-api-key' \
+  --data-urlencode 'package_number_list=PKG-1,PKG-2'
+```
+
+The query parameter can also be repeated:
+
+```text
+?package_number_list=PKG-1&package_number_list=PKG-2
+```
+
+The app signs the request with its configured Shopee credentials and forwards
+it to `SHOPEE_BASE_URL`, so sandbox and live deployments use their respective
+Shopee hosts automatically. The decoded Shopee JSON response is returned
+unchanged, including Shopee error payloads.
+
 ## 🧪 Running Tests
 
 ```bash
@@ -206,7 +281,11 @@ Tests use SQLite (no PostgreSQL required).
 | `SHOPEE_BASE_URL` | Shopee API base URL | `https://partner.shopeemobile.com` |
 | `SHOPEE_REDIRECT_URL` | OAuth callback URL | `http://localhost:8000/api/auth/callback` |
 | `SESSION_SECRET_KEY` | Secret key for session cookies | `change-me-in-production` |
-| `SYNC_INTERVAL_MINUTES` | Auto-sync interval | `60` |
+| `SYNC_INTERVAL_MINUTES` | Product auto-sync interval | `60` |
+| `ORDER_SYNC_ENABLED` | Enable order tracking synchronization | `true` |
+| `ORDER_SYNC_INTERVAL_MINUTES` | Incremental order-sync interval | `5` |
+| `ORDER_SYNC_BACKFILL_DAYS` | Initial tracking history window | `90` |
+| `ORDER_SYNC_OVERLAP_MINUTES` | Incremental update overlap | `30` |
 
 ## 🛠️ Local Development (without Docker)
 

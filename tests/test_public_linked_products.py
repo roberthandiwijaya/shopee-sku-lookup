@@ -78,8 +78,8 @@ async def test_linked_products_page_uses_default_per_page_of_ten(client, seed_pr
     response = await client.get("/linked-products?page=1")
 
     assert response.status_code == 200
-    assert "3 linked families" in response.text
-    assert "Page 1 of 2 (3 linked families)" not in response.text
+    assert "4 linked families" in response.text
+    assert "Page 1 of 2 (4 linked families)" not in response.text
     assert "BC-1001" in response.text
     assert "MP-8002" in response.text
     assert "VR-JE9002" in response.text
@@ -125,7 +125,7 @@ async def test_linked_products_page_invalid_page_defaults_to_first_page_without_
     response = await client.get("/linked-products?page=bad")
 
     assert response.status_code == 200
-    assert "3 linked families" in response.text
+    assert "4 linked families" in response.text
     assert 'href="/linked-products?page=2' not in response.text
     assert "BEDCOVER Blossom" in response.text
     assert "SPREI Aurora" in response.text
@@ -137,8 +137,8 @@ async def test_linked_products_page_defaults_invalid_page_to_first_page_without_
     response = await client.get("/linked-products?page=bad")
 
     assert response.status_code == 200
-    assert "3 linked families" in response.text
-    assert "Page 1 of 2 (3 linked families)" not in response.text
+    assert "4 linked families" in response.text
+    assert "Page 1 of 2 (4 linked families)" not in response.text
     assert "BEDCOVER Blossom" in response.text
     assert "SPREI Aurora" in response.text
     assert "Sprei Microtex Deluxe" in response.text
@@ -202,7 +202,7 @@ async def test_linked_products_page_default_ten_suppresses_pager_for_three_total
     response = await client.get("/linked-products?per_page=10")
 
     assert response.status_code == 200
-    assert "3 linked families" in response.text
+    assert "4 linked families" in response.text
     assert 'href="/linked-products?page=2&amp;per_page=10"' not in response.text
     assert "BC-1001" in response.text
     assert "MP-8002" in response.text

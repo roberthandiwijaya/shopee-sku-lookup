@@ -68,6 +68,49 @@
         </form>
     </div>
 
+    <section class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800" aria-labelledby="pdf-export-title">
+        <h2 id="pdf-export-title" class="text-lg font-semibold">Export mobile PDF catalog</h2>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Select family cards across pages, or enter one family code per line. Up to 250 families per export. Generation runs in the background; downloads remain available for 24 hours. Photos are embedded; long variant lists continue on extra pages.</p>
+        {% include "partials/catalog_collections.html" %}
+        <form id="catalog-export-form" class="mt-4 space-y-4">
+            <div class="flex flex-wrap gap-3">
+                <button type="button" id="select-page" class="rounded-lg border px-3 py-2 text-sm">Select this page</button>
+                <button type="button" id="clear-selection" class="rounded-lg border px-3 py-2 text-sm">Clear selection</button>
+                <span id="selection-count" class="self-center text-sm" aria-live="polite">0 families selected</span>
+            </div>
+            <label class="block text-sm font-medium">Selected family codes (one per line)
+                <textarea id="export-family-codes" rows="3" maxlength="26000" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-3 dark:border-slate-700 dark:bg-slate-950" placeholder="KJ-P0718"></textarea>
+            </label>
+            <div class="flex flex-wrap items-end gap-4">
+                <label class="block text-sm">Include stock
+                    <select id="export-stock-mode" class="mt-1 block rounded-lg border bg-white p-2 dark:border-slate-700 dark:bg-slate-950">
+                        <option value="available">Available stock only</option><option value="all">All, including out of stock</option>
+                    </select>
+                </label>
+                <label class="block text-sm">Minimum stock
+                    <input id="export-min-stock" type="number" min="1" max="1000000" value="1" required class="mt-1 block w-28 rounded-lg border bg-white p-2 dark:border-slate-700 dark:bg-slate-950">
+                </label>
+                <label class="flex items-center gap-2 py-2 text-sm"><input id="export-show-stock" type="checkbox" checked> Show exact stock quantities</label>
+                <label class="flex items-center gap-2 py-2 text-sm"><input id="export-show-prices" type="checkbox" checked> Include prices</label>
+                <label class="block text-sm">Output
+                    <select id="export-output-mode" class="mt-1 block rounded-lg border bg-white p-2 dark:border-slate-700 dark:bg-slate-950">
+                        <option value="single">Single PDF</option><option value="split">Split PDFs (50 families each) + ZIP</option>
+                    </select>
+                </label>
+                <button id="export-pdf-button" type="submit" class="rounded-lg bg-orange-500 px-4 py-2 font-medium text-white disabled:opacity-50">Generate PDF</button>
+                <button id="export-cancel" type="button" hidden class="rounded-lg border px-4 py-2">Cancel export</button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Export uses the selected codes, not just the current page. Stock filters apply to individual variants; families with no matching stock are omitted. Uncheck quantities to show availability labels instead.</p>
+            <div class="flex flex-wrap gap-3">
+                <button type="button" id="export-preflight" class="rounded-lg border px-3 py-2 text-sm">Check selection</button>
+                <button type="button" id="preflight-remove-missing" hidden class="rounded-lg border px-3 py-2 text-sm">Remove missing families</button>
+            </div>
+            <div id="preflight-results" hidden class="rounded-lg border p-3 text-sm" aria-live="polite"></div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Generation checks your selection first. Review the result, then confirm. Stock may change before processing. Use your PDF reader’s bookmarks to jump between families.</p>
+            <p id="export-status" class="text-sm" role="status" aria-live="polite"></p>
+            <div id="export-downloads" class="flex flex-wrap gap-3"></div>
+        </form>
+    </section>
     {% if family_cards %}
     <div class="space-y-6">
         {% for family in family_cards %}
@@ -107,6 +150,7 @@
                                 <div>
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Family Code</p>
                                     <h2 class="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">{{ family.family_code }}</h2>
+                                    <label class="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" class="catalog-family-select" value="{{ family.family_code }}"> Include in PDF</label>
                                 </div>
                                 {% if family.jenis_bahan %}
                                 <div>
@@ -218,4 +262,5 @@
     </div>
     {% endif %}
 </div>
+{% include "partials/catalog_export_script.html" %}
 {% endblock %}

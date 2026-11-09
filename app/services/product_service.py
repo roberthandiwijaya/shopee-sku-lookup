@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from app.config import settings
 from app.models.product import AuthAlert, Product, ProductModel, ShopeeToken, ShopInfo, TZ_GMT7
@@ -198,62 +198,69 @@ async def list_linked_product_families(
     page: int = 1,
     per_page: int = 25,
 ) -> dict:
-    result = await session.execute(
-        select(Product)
-        .options(selectinload(Product.models))
-        .where(Product.family_code.isnot(None), Product.family_code != "")
-        .order_by(Product.family_code, Product.item_name, Product.item_id)
-    )
-    products = result.scalars().all()
-
-    normalized_jenis_bahan = normalize_jenis_bahan(jenis_bahan)
-    normalized_family_code = normalize_family_code(family_code) if family_code else None
-    normalized_variants = _normalize_linked_product_variants(variants)
-    minimum_stock = max(min_stock, 1)
-
-    grouped: dict[str, list[Product]] = defaultdict(list)
-    for product in products:
-        grouped[product.family_code].append(product)
-
-    filtered_groups: dict[str, list[Product]] = {}
-    for grouped_family_code, family_products in grouped.items():
-        if len(family_products) <= 1:
-            continue
-        if normalized_family_code and grouped_family_code != normalized_family_code:
-            continue
-        if normalized_jenis_bahan:
-            family_jenis_values = {
-                normalize_jenis_bahan(product.jenis_bahan).upper()
-                for product in family_products
-                if product.jenis_bahan
-            }
-            if normalized_jenis_bahan.upper() not in family_jenis_values:
-                continue
-        if not _matches_variant_filters(family_products, normalized_variants, minimum_stock):
-            continue
-        filtered_groups[grouped_family_code] = family_products
-
-    family_cards = sorted(
-        [
-            _build_family_card(grouped_family_code, family_products)
-            for grouped_family_code, family_products in filtered_groups.items()
-        ],
-        key=lambda card: card["family_code"],
-    )
-
-    total = len(family_cards)
+    # Filter and page family keys first; hydrate only the selected families.
+    normalized_material = normalize_jenis_bahan(jenis_bahan)
+    normalized_family = normalize_family_code(family_code)
+    requested_variants = _normalize_linked_product_variants(variants)
+    per_page = max(1, per_page)
+    families = select(Product.family_code).where(
+        Product.family_code.isnot(None), Product.family_code != ""
+    ).distinct()
+    if normalized_family:
+        families = families.where(Product.family_code == normalized_family)
+    if normalized_material:
+        material = await _normalized_sql(session, Product.jenis_bahan)
+        families = families.where(Product.family_code.in_(
+            select(Product.family_code).where(material == normalized_material.upper())
+        ))
+    if requested_variants:
+        model_name = await _normalized_sql(session, ProductModel.model_name, variant=True)
+        for term in requested_variants:
+            # Each term may match a different sibling/model, but all must match.
+            families = families.where(Product.family_code.in_(
+                select(Product.family_code).join(Product.models).where(
+                    model_name.contains(term, autoescape=True),
+                    ProductModel.stock >= max(min_stock, 1),
+                )
+            ))
+    total = await session.scalar(select(func.count()).select_from(families.subquery())) or 0
     total_pages = max(1, math.ceil(total / per_page))
     current_page = min(max(page, 1), total_pages)
-    offset = (current_page - 1) * per_page
-    paged_family_cards = family_cards[offset: offset + per_page]
-
+    keys = (await session.scalars(
+        families.order_by(Product.family_code).offset((current_page - 1) * per_page).limit(per_page)
+    )).all()
+    grouped: dict[str, list[Product]] = defaultdict(list)
+    if keys:
+        products = await session.scalars(
+            select(Product).options(selectinload(Product.models))
+            .where(Product.family_code.in_(keys))
+        )
+        for product in products:
+            grouped[product.family_code].append(product)
     return {
-        "family_cards": paged_family_cards,
-        "total": total,
-        "page": current_page,
-        "per_page": per_page,
+        "family_cards": [_build_family_card(key, grouped[key]) for key in keys],
+        "total": total, "page": current_page, "per_page": per_page,
         "total_pages": total_pages,
     }
+
+
+async def _normalized_sql(session: AsyncSession, column, variant: bool = False):
+    """Normalize legacy whitespace in SQL, without hydrating the catalog."""
+    if session.get_bind().dialect.name == "sqlite":
+        # SQLite has no regexp_replace; install an equivalent scalar on this connection.
+        connection = await session.connection()
+        await connection.run_sync(lambda conn: conn.connection.dbapi_connection.create_function(
+            "catalog_normalize_variant" if variant else "catalog_normalize_text", 1,
+            (lambda value: _normalize_variant_term(value or "")) if variant
+            else (lambda value: " ".join((value or "").split()).upper()),
+            deterministic=True,
+        ))
+        return (func.catalog_normalize_variant(column) if variant else func.catalog_normalize_text(column))
+    value = func.trim(func.regexp_replace(func.upper(func.coalesce(column, "")), r"\s+", " ", "g"))
+    if variant:
+        value = func.replace(value, "×", "X")
+        value = func.replace(func.replace(func.replace(value, " X ", "X"), " X", "X"), "X ", "X")
+    return value
 
 
 def normalize_family_code(value: str | None) -> str | None:
@@ -277,65 +284,49 @@ async def list_products_paginated(
     search_sku: str | None = None,
     partner_filter: str | None = None,
 ) -> dict:
-    """List products with pagination, search, and partner filters."""
-    base = select(Product).options(selectinload(Product.models))
-
+    """Page in SQL; partner counts always describe the entire local catalog."""
+    sibling = aliased(Product)
+    partner_count = (
+        select(func.count(sibling.id)).where(
+            sibling.family_code == Product.family_code,
+            sibling.id != Product.id, Product.family_code != "",
+        ).correlate(Product).scalar_subquery()
+    )
+    conditions = []
     if search_sku:
         pattern = f"%{search_sku}%"
-        normalized_search = search_sku.strip().upper()
-        base = (
-            base.outerjoin(Product.models)
-            .where(
-                or_(
-                    Product.item_name.ilike(pattern),
-                    Product.item_sku.ilike(pattern),
-                    Product.family_code.ilike(pattern),
-                    Product.jenis_bahan.ilike(pattern),
-                    ProductModel.model_sku.ilike(pattern),
-                    Product.family_code == normalized_search,
-                )
-            )
-            .distinct()
-        )
-
-    result = await session.execute(base.order_by(Product.item_name))
-    products = result.scalars().unique().all()
-
-    family_counts: dict[str, int] = defaultdict(int)
-    for product in products:
-        if product.family_code:
-            family_counts[product.family_code] += 1
-
-    enriched_products: list[Product] = []
-    for product in products:
+        conditions.append(or_(
+            Product.item_name.ilike(pattern), Product.item_sku.ilike(pattern),
+            Product.family_code.ilike(pattern), Product.jenis_bahan.ilike(pattern),
+            Product.models.any(ProductModel.model_sku.ilike(pattern)),
+            Product.family_code == search_sku.strip().upper(),
+        ))
+    if partner_filter == "has_partners":
+        conditions.append(partner_count > 0)
+    elif partner_filter == "no_partners":
+        conditions.append(partner_count == 0)
+    elif partner_filter == "has_family_code":
+        conditions.extend([Product.family_code.isnot(None), Product.family_code != ""])
+    elif partner_filter == "no_family_code":
+        conditions.append(or_(Product.family_code.is_(None), Product.family_code == ""))
+    total = await session.scalar(select(func.count(Product.id)).where(*conditions)) or 0
+    per_page, page = max(1, per_page), max(1, page)
+    rows = await session.execute(
+        select(Product, partner_count.label("partner_count"))
+        .options(selectinload(Product.models)).where(*conditions)
+        .order_by(Product.item_name, Product.item_id)
+        .offset((page - 1) * per_page).limit(per_page)
+    )
+    products = []
+    for product, count in rows:
         product.image_urls = _get_product_image_urls(product)
         product.primary_image_url = product.image_urls[0] if product.image_urls else None
-        product.partner_count = family_counts.get(product.family_code, 0) - 1 if product.family_code else 0
-        product.has_partners = product.partner_count > 0
-        enriched_products.append(product)
-
-    if partner_filter == "has_partners":
-        enriched_products = [product for product in enriched_products if product.has_partners]
-    elif partner_filter == "no_partners":
-        enriched_products = [product for product in enriched_products if not product.has_partners]
-    elif partner_filter == "has_family_code":
-        enriched_products = [product for product in enriched_products if product.family_code]
-    elif partner_filter == "no_family_code":
-        enriched_products = [product for product in enriched_products if not product.family_code]
-
-    total = len(enriched_products)
-    total_pages = max(1, math.ceil(total / per_page))
-
-    offset = (page - 1) * per_page
-    paged_products = enriched_products[offset: offset + per_page]
-
+        product.partner_count = count
+        product.has_partners = count > 0
+        products.append(product)
     return {
-        "products": paged_products,
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "total_pages": total_pages,
-        "partner_filter": partner_filter,
+        "products": products, "total": total, "page": page, "per_page": per_page,
+        "total_pages": max(1, math.ceil(total / per_page)), "partner_filter": partner_filter,
     }
 
 

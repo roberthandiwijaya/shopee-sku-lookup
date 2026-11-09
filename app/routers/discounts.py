@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Security
-from fastapi.security import APIKeyHeader
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_session
+from app.dependencies import verify_api_key
 from app.schemas.discount import (
     DiscountActionResponse,
     DiscountAddItemsRequest,
@@ -19,13 +19,6 @@ from app.services import discount_service
 from app.services.shopee_auth import get_valid_token
 
 router = APIRouter(prefix="/api/discounts", tags=["discounts"])
-
-api_key_header = APIKeyHeader(name="X-API-Key")
-
-
-async def verify_api_key(api_key: str = Security(api_key_header)):
-    if api_key != settings.api_key:
-        raise HTTPException(status_code=403, detail="Invalid API key")
 
 
 # ── Sync (declared before /{discount_id} to avoid route collision) ────────────

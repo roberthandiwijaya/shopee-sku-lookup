@@ -23,11 +23,56 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_sandbox
+    volumes:
+      - catalog_exports:/exports
     ports:
       - "8001:8000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.shopee-sandbox.rule=Host(`shopee-sb.techly.id`)
+      - traefik.http.routers.shopee-sandbox.entrypoints=websecure
+      - traefik.http.routers.shopee-sandbox.tls.certresolver=letsencrypt
+      - traefik.http.services.shopee-sandbox.loadbalancer.server.port=8000
+      - traefik.docker.network=traefik
+    networks:
+      - default
+      - traefik
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  order-worker:
+    build: .
+    container_name: shopee-sandbox-order-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_sandbox
+    command: ["python", "-m", "app.tasks.order_refresh_worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  catalog-export-worker:
+    build: .
+    container_name: shopee-sandbox-catalog-export-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shopee_sandbox
+    command: ["python", "-m", "app.tasks.catalog_export_worker"]
+    volumes:
+      - catalog_exports:/exports
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
+  catalog_exports:
   sandbox_pgdata:
+
+networks:
+  traefik:
+    external: true
