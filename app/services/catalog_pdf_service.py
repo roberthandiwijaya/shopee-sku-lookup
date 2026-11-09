@@ -153,7 +153,7 @@ class _FamilyMarker(Flowable):
         self.canv.showOutline()
 
 
-def render_catalog_pdf(cards, *, show_stock=True, show_prices=True, stock_mode="available", min_stock=1, images=None, omitted=0, snapshot_at=None):
+def render_catalog_pdf(cards, *, show_stock=False, show_prices=True, stock_mode="available", min_stock=1, images=None, omitted=0, snapshot_at=None):
     """Build an A5 PDF. Tables split between rows and repeat their product heading."""
     output = io.BytesIO()
     images = images or {}
@@ -170,8 +170,32 @@ def render_catalog_pdf(cards, *, show_stock=True, show_prices=True, stock_mode="
         "white": ParagraphStyle("white", fontName="Helvetica-Bold", fontSize=8, leading=11, textColor=colors.white),
     }
 
+    # Dark text colors remain legible on both white and pale alternating rows.
+    for name, color in (("empty", "#8A4545"), ("limited", "#A12622"),
+                        ("available", "#945000"), ("plenty", "#236653"),
+                        ("unknown", "#526461")):
+        styles["stock_" + name] = ParagraphStyle(
+            "stock_" + name, fontName="Helvetica-Bold", fontSize=8, leading=10,
+            textColor=colors.HexColor(color), splitLongWords=False,
+        )
+
     def p(value, style="body"):
         return Paragraph(escape(str(value or "-")), styles[style])
+
+    def stock_cell(stock):
+        if stock is None:
+            return p("Stok Belum Dikonfirmasi", "stock_unknown")
+        if show_stock:
+            return p(f"{stock} pcs")
+        if stock <= 0:
+            label, style = "Stok Habis", "empty"
+        elif stock <= 2:
+            label, style = "Stok Terbatas", "limited"
+        elif stock <= 5:
+            label, style = "Stok Tersedia", "available"
+        else:
+            label, style = "Stok Banyak", "plenty"
+        return p(label, "stock_" + style)
 
     stamp = (snapshot_at or datetime.now(TZ_GMT7)).astimezone(TZ_GMT7).strftime("%d %b %Y, %H:%M WIB")
 
@@ -218,23 +242,22 @@ def render_catalog_pdf(cards, *, show_stock=True, show_prices=True, stock_mode="
             story.append(p("Product image unavailable", "small"))
         story.append(Spacer(1, 4*mm))
         for product in card["products"]:
-            widths = [usable*.40, usable*.34, usable*.26] if show_prices else [usable*.70, usable*.30]
+            # Label mode reserves enough room for the unconfirmed label in two lines,
+            # even with prices on A5; exact quantities retain the compact column.
+            stock_fraction = .26 if show_stock else .34
+            widths = ([usable*(.66 - stock_fraction), usable*.34, usable*stock_fraction]
+                      if show_prices else [usable*(1 - stock_fraction), usable*stock_fraction])
             headings = [p("SIZE / VARIANT", "white")]
             if show_prices:
                 headings.append(p("PRICE", "white"))
-            headings.append(p("STOCK" if show_stock else "STATUS", "white"))
+            headings.append(p("STOK" if show_stock else "STATUS", "white"))
             rows = [[p(product["name"], "title")] + [""] * (len(widths) - 1), headings]
             for row in product["rows"]:
-                stock = row["stock"]
-                if show_stock:
-                    stock_label = f"{stock} pcs" if stock is not None else "Unknown"
-                else:
-                    stock_label = "Unknown" if stock is None else ("Available" if stock > 0 else "Out of stock")
                 cells = [p(row["name"])]
                 if show_prices:
                     price = "-" if row["price"] is None else "Rp" + format(Decimal(str(row["price"])), ",.0f").replace(",", ".")
                     cells.append(p(price))
-                cells.append(p(stock_label))
+                cells.append(stock_cell(row["stock"]))
                 rows.append(cells)
             table = LongTable(rows, colWidths=widths, repeatRows=2, hAlign="LEFT")
             table.setStyle(TableStyle([("SPAN",(0,0),(-1,0)), ("BACKGROUND",(0,1),(-1,1),accent),
@@ -243,12 +266,12 @@ def render_catalog_pdf(cards, *, show_stock=True, show_prices=True, stock_mode="
                 ("TOPPADDING",(0,0),(-1,-1),8), ("BOTTOMPADDING",(0,0),(-1,-1),8),
                 ("LINEBELOW",(0,2),(-1,-1),.4,line)]))
             story.extend([table, Spacer(1, 3*mm)])
-        stock_description = f"Minimum stock: {min_stock}" if stock_mode == "available" else "All stock levels included"
-        story.append(p(stock_description + " | " + ("Quantities shown" if show_stock else "Quantities hidden"), "small"))
-        disclaimer = "Prices and stock may change." if show_prices else "Stock may change."
-        story.append(p(disclaimer + " Availability is a snapshot, not a reservation.", "small"))
+        if show_stock:
+            stock_description = f"Stok minimum: {min_stock}" if stock_mode == "available" else "Semua status stok disertakan"
+            story.append(p(stock_description + " | Jumlah stok ditampilkan", "small"))
+        story.append(p("Stok dapat berubah sewaktu-waktu. Mohon konfirmasi ketersediaan stok sebelum memesan.", "small"))
         if omitted:
-            story.append(p(f"{omitted} selected families omitted because no rows matched the stock filter.", "small"))
+            story.append(p("Sebagian kelompok produk tidak disertakan karena tidak sesuai dengan filter stok.", "small"))
     doc = SimpleDocTemplate(output, pagesize=A5, leftMargin=14*mm, rightMargin=14*mm,
                             topMargin=14*mm, bottomMargin=19*mm, title="Product Catalog", author="", pageCompression=1)
     # SimpleDocTemplate creates page templates internally; a canvas subclass provides an end-of-page hook.

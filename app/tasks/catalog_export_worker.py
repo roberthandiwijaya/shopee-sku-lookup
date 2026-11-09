@@ -152,6 +152,15 @@ class CatalogExportWorker:
 
     async def process(self, job, directory):
         options = job.options
+        # Exact inventory needs server-recorded admin approval, never just a payload flag.
+        show_quantities = False
+        if options.get('show_stock') is True:
+            from app.models.product import DashboardUser
+            async with async_session() as session:
+                user_id = options.get('quantity_admin_user_id')
+                user = await session.get(DashboardUser, user_id) if type(user_id) is int else None
+                show_quantities = bool(user and not user.must_change_password and
+                                       user.username in settings.catalog_export_admin_usernames)
         snapshot = jobs.now()
         async with async_session() as session:
             # A coherent catalog snapshot; materialize all selected rows before slow image work.
@@ -175,7 +184,7 @@ class CatalogExportWorker:
                 valid_photo.close()
             # Decode/normalize and render one family at a time; original photos never accumulate.
             data = await self.work(job,pdf.render_catalog_pdf, [card], images=images,
-                show_stock=options['show_stock'], show_prices=options.get('show_prices', True),
+                show_stock=show_quantities, show_prices=options.get('show_prices', True),
                 stock_mode=options['stock_mode'],
                 min_stock=options['min_stock'], snapshot_at=snapshot, omitted=omitted)
             path = directory / f'part-{index:03}.pdf'

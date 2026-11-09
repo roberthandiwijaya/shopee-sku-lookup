@@ -11,6 +11,10 @@
     let approvedSelection = null, missingFamilies = [], preflightBusy = false;
     let submitting = false, activeJob = false, cancelBusy = false, cancelRequested = false;
     let sessionPromise = null, cooldownTimer;
+    const stockCheckbox = byId('export-show-stock');
+    let canExportQuantities = Boolean(stockCheckbox.dataset && stockCheckbox.dataset.canExportQuantities === 'true');
+    stockCheckbox.checked = false;
+    stockCheckbox.disabled = !canExportQuantities;
     const cooldowns = {generation: {until: 0, message: ''}, preflight: {until: 0, message: ''}};
     const preflightResults = byId('preflight-results'), preflightButton = byId('export-preflight');
     function remaining(kind) { return Math.max(0, Math.ceil((cooldowns[kind].until - Date.now()) / 1000)); }
@@ -41,6 +45,12 @@
                 const response = await checked(await fetch('/linked-products/export-session', {credentials: 'same-origin'}));
                 const data = await response.json();
                 if (typeof data.csrf_token !== 'string' || !data.csrf_token) throw new Error('Could not initialize export session. Please try again.');
+                canExportQuantities = data.can_export_quantities === true;
+                stockCheckbox.disabled = !canExportQuantities;
+                if (!canExportQuantities && stockCheckbox.checked) {
+                    stockCheckbox.checked = false;
+                    invalidatePreflight();
+                }
                 return data.csrf_token;
             })().catch(error => { sessionPromise = null; throw error; });
         }
@@ -49,7 +59,7 @@
     function selectionOptions() {
         return {family_codes:[...selected],stock_mode:mode.value,
             min_stock:mode.value === 'all' ? 1 : Number(minimum.value),
-            show_stock:byId('export-show-stock').checked,show_prices:byId('export-show-prices').checked,
+            show_stock:canExportQuantities && stockCheckbox.checked,show_prices:byId('export-show-prices').checked,
             output_mode:byId('export-output-mode').value};
     }
     function invalidatePreflight() {
@@ -260,7 +270,7 @@
             if (!collection) { collectionStatus.textContent = 'Choose a saved collection first.'; return; }
             const options = collection.options; selected = new Set(options.family_codes);
             mode.value = options.stock_mode; minimum.value = options.min_stock; minimum.disabled = mode.value === 'all';
-            byId('export-show-stock').checked = options.show_stock;
+            stockCheckbox.checked = canExportQuantities && options.show_stock === true;
             byId('export-show-prices').checked = options.show_prices;
             byId('export-output-mode').value = options.output_mode;
             name.value = collection.name; refresh();
