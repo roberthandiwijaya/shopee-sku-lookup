@@ -70,7 +70,7 @@ def test_merge_remaps_reused_local_bookmark_keys(tmp_path):
     assert_destinations(reader, codes, expected_pages)
     text = '\n'.join(page.extract_text() for page in reader.pages)
     assert '987.654' not in text and 'PRICE' not in text and '37 pcs' not in text
-    assert 'Available' in text
+    assert 'Stok Banyak' in text
 
 
 @pytest.mark.asyncio

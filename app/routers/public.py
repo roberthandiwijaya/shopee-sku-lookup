@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.services import catalog_pdf_service, catalog_export_service as export_jobs, product_service
 from app.config import settings
-from app.services import catalog_identity
+from app.services import catalog_identity, catalog_stock_auth
 
 router = APIRouter(tags=["public"])
 
@@ -26,7 +26,7 @@ class CatalogExportRequest(BaseModel):
     family_codes: list[str] = Field(min_length=1, max_length=catalog_pdf_service.MAX_FAMILIES)
     stock_mode: Literal["all", "available"] = "available"
     min_stock: int = Field(default=1, ge=1, le=1_000_000)
-    show_stock: bool = True
+    show_stock: bool = False
     show_prices: bool = True
 
 
@@ -36,18 +36,23 @@ class BackgroundExportRequest(CatalogExportRequest):
 
 
 @router.get("/linked-products/export-session")
-async def export_session(request: Request, response: Response):
+async def export_session(request: Request, response: Response, session: AsyncSession = Depends(get_session)):
     response.headers["Cache-Control"] = "no-store"
-    return {"csrf_token": catalog_identity.bootstrap(request)}
+    return {"csrf_token": catalog_identity.bootstrap(request),
+            "can_export_quantities": await catalog_stock_auth.can_export_quantities(request, session)}
 
 
 @router.post("/linked-products/exports", status_code=202)
 async def create_catalog_export(payload: BackgroundExportRequest, request: Request, response: Response,
                                 session: AsyncSession = Depends(get_session)):
     owner = catalog_identity.require_export_session(request)
+    quantity_user = await catalog_stock_auth.require_quantity_permission(request, session, payload.show_stock)
     network = catalog_identity.network_hash(request)
+    options = payload.model_dump()
+    if quantity_user is not None:
+        options['quantity_admin_user_id'] = quantity_user
     try:
-        job, token = await export_jobs.create_job(session, payload.model_dump(), owner, network)
+        job, token = await export_jobs.create_job(session, options, owner, network)
     except export_jobs.RateLimited as exc:
         return catalog_identity.limited_response(exc)
     except export_jobs.QueueFull as exc:
@@ -98,6 +103,7 @@ async def cancel_catalog_export(job_id: str, request: Request, response: Respons
 async def download_catalog_export(job_id: str, filename: str, request: Request,
                                    session: AsyncSession = Depends(get_session)):
     job = await _get_export_job(request, session, job_id)
+    await catalog_stock_auth.require_quantity_permission(request, session, job.options.get('show_stock') is True)
     return _catalog_export_file(job, filename)
 
 
@@ -107,6 +113,7 @@ async def direct_catalog_download(job_id: str, filename: str, request: Request,
                                   session: AsyncSession = Depends(get_session)):
     # Native form download: capability stays in the POST body, never in URLs or cookies.
     job = await _get_export_job(request, session, job_id, token=token)
+    await catalog_stock_auth.require_quantity_permission(request, session, job.options.get('show_stock') is True)
     return _catalog_export_file(job, filename)
 
 
@@ -191,4 +198,5 @@ async def linked_products_page(request: Request, session: AsyncSession = Depends
         "min_stock": min_stock,
         "per_page": per_page,
         "filter_error": filter_error,
+        "can_export_quantities": await catalog_stock_auth.can_export_quantities(request, session),
     }, headers={"Cache-Control": "no-store"})

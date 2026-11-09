@@ -31,6 +31,14 @@ Migration `015` adds immutable quota metadata and bounded preflight buckets. Net
 
 A dedicated renderer lock and delayed terminal cancellation keep the slot occupied until render-thread/cleanup work drains. Keep one worker replica initially. Python threads cannot be forcibly killed by the job deadline; a lost database connection can release the lock while a thread survives. This is bounded accidental/simple-abuse protection, not DDoS protection or a promise that resource exhaustion is impossible.
 
+## Customer PDF stock labels
+
+Customer-facing PDFs default to words only: `Stok Habis` (0), red `Stok Terbatas` (1–2), orange `Stok Tersedia` (3–5), green `Stok Banyak` (6+). Unknown stock is `Stok Belum Dikonfirmasi`, never assumed zero. PDF labels do not include numeric ranges. Every PDF includes: “Stok dapat berubah sewaktu-waktu. Mohon konfirmasi ketersediaan stok sebelum memesan.” Choose all stock levels to include zero-stock rows; the default available-stock filter still omits them.
+
+The unchecked “Tampilkan jumlah stok (pcs)” option requires an authenticated admin with password-change requirements satisfied. Until a role system exists, `CATALOG_EXPORT_ADMIN_USERNAMES` is the explicit JSON username allowlist (default `["admin"]`), verified against the current database user; never trust a session username alone. Creation, preflight and quantity-preset saves reject unauthorized `show_stock=true`. Workers require server-recorded admin approval and recheck that account before rendering pcs. Exact-quantity downloads also require current admin login, even with a valid file capability. Non-quantity customer downloads remain public/capability-protected. Previously generated exact-quantity files are admin-protected; previously downloaded/shared files cannot be recalled.
+
+Stock labels apply to generated PDFs, not a claim that exact inventory is secret across the whole site: existing public product cards/APIs and preflight still expose some quantities. A full inventory privacy change is outside this feature.
+
 ## Tech Stack
 
 - **Python 3.11+** / **FastAPI**

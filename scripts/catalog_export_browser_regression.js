@@ -20,9 +20,9 @@ const approved = {included_families: 1, matching_rows: 1, errors: [], warnings: 
     families: [], missing: [], can_export: true};
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 
-function browser(savedJob = null) {
+function browser(savedJob = null, admin = false) {
     class Element {
-        constructor() { this.value = ''; this.checked = false; this.children = []; this.handlers = {}; this.hidden = false; this.disabled = false; this.textContent = ''; }
+        constructor() { this.value = ''; this.checked = false; this.dataset = {}; this.children = []; this.handlers = {}; this.hidden = false; this.disabled = false; this.textContent = ''; }
         addEventListener(name, fn) { this.handlers[name] = fn; }
         appendChild(child) { this.children.push(child); }
         replaceChildren(...children) { this.children = children; }
@@ -34,6 +34,7 @@ function browser(savedJob = null) {
         'export-show-prices','export-output-mode','selection-count','select-page','clear-selection'];
     ids.forEach(id => elements.set(id, new Element()));
     const el = id => elements.get(id);
+    el('export-show-stock').dataset.canExportQuantities = String(admin);
     el('export-stock-mode').value = 'available'; el('export-min-stock').value = '1';
     el('export-output-mode').value = 'single';
     const storage = new Map([['catalog-pdf-selection-v1', '["FAMILY"]']]);
@@ -119,4 +120,20 @@ test('accepted job replaces downloads and running cancellation waits for termina
     assert.match(b.el('export-status').textContent, /Waiting for processing to stop/);
     b.replies.push(response({status: 'cancelled'})); await b.advance(3);
     assert.equal(b.el('export-pdf-button').disabled, false);
+});
+
+test('guest stock quantity tampering stays false; admin checkbox is explicit opt-in', async () => {
+    for (const admin of [false, true]) {
+        const b = browser(null, admin);
+        b.replies.push(response({csrf_token:'csrf',can_export_quantities:admin}), response(approved));
+        b.start();
+        assert.equal(b.el('export-show-stock').checked, false);
+        assert.equal(b.el('export-show-stock').disabled, !admin);
+        await b.fire('export-preflight');
+        assert.equal(JSON.parse(b.requests[1].options.body).show_stock, false);
+        b.el('export-show-stock').checked = true;
+        b.replies.push(response(approved));
+        await b.fire('export-preflight');
+        assert.equal(JSON.parse(b.requests[2].options.body).show_stock, admin);
+    }
 });
