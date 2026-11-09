@@ -57,7 +57,8 @@ class Product(Base):
     )
 
     models: Mapped[list["ProductModel"]] = relationship(
-        back_populates="product", cascade="all, delete-orphan"
+        back_populates="product", cascade="all, delete-orphan",
+        primaryjoin="and_(Product.id == ProductModel.product_id, ProductModel.is_active == True)",
     )
 
 
@@ -71,6 +72,7 @@ class ProductModel(Base):
     )
     item_id: Mapped[int | None] = mapped_column(BigInteger)
     model_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     model_sku: Mapped[str | None] = mapped_column(String(255))
     model_name: Mapped[str | None] = mapped_column(String(500))
     original_price: Mapped[float | None] = mapped_column(Numeric(15, 2))
